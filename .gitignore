@@ -15,5 +15,10 @@ Cargo.lock
 
 
 # Added by cargo
-
 /target
+
+# Production Docker Compose Configuration
+production.yml
+
+# Development PostgreSQL database persistence
+postgres-data/

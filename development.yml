@@ -1,0 +1,20 @@
+x-shared-environment: &shared-environment
+  POSTGRES_USER: test
+  POSTGRES_PASSWORD: test
+
+services:
+  api:
+    environment: *shared-environment
+    ports:
+      - 1337:1337
+    develop:
+      watch:
+        - action: rebuild
+          path: ./src
+
+  database:
+    image: postgres
+    restart: always
+    environment: *shared-environment
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data

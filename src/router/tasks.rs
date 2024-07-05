@@ -5,5 +5,5 @@ use axum::{
 
 pub fn get_routes() -> Router {
     return Router::new()
-    .route("/", get(|| async { "example task\n" }));
+    .route("/", get(|| async { "I'm having the time of my life\n" }));
 }
