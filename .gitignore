@@ -22,3 +22,6 @@ production.yml
 
 # Development PostgreSQL database persistence
 postgres-data/
+
+# Ignore secrets dir
+secrets/
