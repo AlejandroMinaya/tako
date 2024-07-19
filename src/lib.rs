@@ -23,19 +23,19 @@ pub enum Error {
     UnknownError
 }
 
-/* STRUCTS */
+/* TASK DEFINITION */
 #[derive(Debug, Default, Clone)]
 pub struct Task {
     id: u16,
-    children: BTreeSet<Rc<Self>>,
+    children: Rc<BTreeSet<Rc<Self>>>,
     title: String,
     importance: u16,
     urgency: u16,
     status: TaskStatus
 }
 impl Task {
-    pub fn add_subtask(&mut self, subtask: Rc<Self>) {
-        self.children.insert(subtask);
+    pub fn add_subtask(&self, subtask: Rc<Self>) {
+        (*self.children).insert(subtask);
     }
 }
 impl Ord for Task {
@@ -110,5 +110,14 @@ mod test {
             task.children.contains(&subtask),
             "Expected subtask to be included as subtask child"
         );
+    }
+
+    fn test_adding_subtask_with_children_doesnt_append_grandchildren () {
+        let mut grand_task = Task::default();
+        let mut task = Rc::new(Task { id: 1, ..Default::default() });
+        let child_task = Rc::new(Task { id: 2, ..Default::default() });
+
+        (*task).add_subtask(child_task.clone());
+        grand_task.add_subtask(task.clone());
     }
 }
