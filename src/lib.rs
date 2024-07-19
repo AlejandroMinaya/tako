@@ -17,13 +17,18 @@ pub enum Error {
 }
 
 /* STRUCTS */
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone)]
 pub struct Task {
     id: u16,
     title: String,
     importance: u16,
     urgency: u16,
     status: TaskStatus
+}
+impl PartialEq for Task {
+    fn eq(&self, other: &Task) -> bool {
+        return self.id == other.id
+    }
 }
 
 /* PORTS & ADAPTERS */
