@@ -5,5 +5,5 @@ CREATE TABLE tasks (
     importance      SERIAL,                                 -- Importance Score
     urgency         SERIAL,                                 -- Urgency Score
     status          task_status NOT NULL DEFAULT 'OPEN',    -- Task Status
-    parent_task_id  iNT REFERENCES tasks(id)                -- Parent Task Reference (if needed)
+    parent_task_id  INT REFERENCES tasks(id)                -- Parent Task Reference (if needed)
 );

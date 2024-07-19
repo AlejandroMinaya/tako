@@ -1,5 +1,3 @@
-use std::env;
-
 mod router;
 
 #[tokio::main]
