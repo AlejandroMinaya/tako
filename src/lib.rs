@@ -27,15 +27,15 @@ pub enum Error {
 #[derive(Debug, Default, Clone)]
 pub struct Task {
     id: u16,
-    children: BTreeSet<Task>,
+    children: BTreeSet<Rc<Self>>,
     title: String,
     importance: u16,
     urgency: u16,
     status: TaskStatus
 }
 impl Task {
-    pub fn add_subtask(&self, subtask: &Self) {
-        todo!();
+    pub fn add_subtask(&mut self, subtask: Rc<Self>) {
+        self.children.insert(subtask);
     }
 }
 impl Ord for Task {
@@ -98,13 +98,13 @@ mod test {
 
     #[test]
     fn test_adding_subtask_to_task () {
-        let task = Task::default();
+        let mut task = Task::default();
         let subtask = Rc::new(Task {
             id: 1,
             ..Default::default()
         });
 
-        task.add_subtask(&subtask);
+        task.add_subtask(subtask.clone());
 
         assert!(
             task.children.contains(&subtask),
