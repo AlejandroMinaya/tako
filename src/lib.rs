@@ -39,8 +39,8 @@ pub trait TaskPort {
 
 /* -- DATA PORTS & ADAPTERS */
 pub trait DataPort {
-    fn write() -> Result<Box<Task>, Error>;
     fn save() -> Result<Box<Task>, Error>;
+    fn get_by_id(id: u16) -> Result<Box<Task>, Error>;
 }
 
 
