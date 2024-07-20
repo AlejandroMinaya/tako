@@ -93,11 +93,11 @@ mod test {
     #[test]
     fn test_distance_to_max_task_overflow () {
         let task = Task {
-            importance: u32::MAX,
-            urgency: u32::MAX,
+            importance: f32::MAX,
+            urgency: f32::MAX,
             ..Default::default()
         };
-        assert_eq!(task.get_distance(), 2_u32.pow(16) as f32);
+        assert_eq!(task.get_distance(), 2_f32.powf(16.0));
     }
 
     #[test]
@@ -108,7 +108,7 @@ mod test {
             ..Default::default()
         };
 
-        assert_eq!(task.get_distance(), 5 as f32);
+        assert_eq!(task.get_distance(), 5.0);
     }
 
 
