@@ -140,10 +140,10 @@ mod test {
             ..Default::default()
         };
 
-        root.add_task(task_a);
-        root.add_task(task_b);
-        root.add_task(task_c);
-        root.add_task(task_d);
+        root.all_tasks.insert(Box::new(task_a));
+        root.all_tasks.insert(Box::new(task_b));
+        root.all_tasks.insert(Box::new(task_c));
+        root.all_tasks.insert(Box::new(task_d));
 
         let mut task_itr = root.all_tasks.into_iter();
         assert_eq!(Some(Box::new(task_b)), task_itr.next());
