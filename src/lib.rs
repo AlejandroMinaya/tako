@@ -9,7 +9,9 @@ struct Task {
 }
 impl Task {
     fn get_distance_to_max (&self) -> u32 {
-        todo!();
+        let importance_comp = (u32::MAX - self.importance).saturating_pow(2);
+        let urgency_comp = (u32::MAX - self.urgency).saturating_pow(2);
+        (importance_comp.saturating_add(urgency_comp) as f32).sqrt().round() as u32
     }
 }
 impl PartialEq for Task {
@@ -86,22 +88,25 @@ mod test {
 
     #[test]
     fn test_distance_to_max_task() {
-        let task_a = Task {
+        let task = Task {
             importance: u32::MAX,
             urgency: u32::MAX,
             ..Default::default()
         };
-        let task_b = Task {
-            importance: 2_u32.pow(32) - 5,
-            urgency: 2_u32.pow(32) - 13,
+        assert_eq!(task.get_distance_to_max(), 0);
+    }
+
+    #[test]
+    fn test_distance_to_max_task_overflow () {
+        let task = Task {
+            importance: u32::MAX - 4,
+            urgency: u32::MAX - 3,
             ..Default::default()
         };
 
-        assert_eq!(task_a.get_distance_to_max(), 0);
-        assert_eq!(task_b.get_distance_to_max(), 4);
-
-
+        assert_eq!(task.get_distance_to_max(), 5);
     }
+
 
     #[test]
     fn test_multiple_sorted_importance_urgency () {
