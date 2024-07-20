@@ -9,8 +9,8 @@ struct Task {
 }
 impl Task {
     fn get_distance (&self) -> u32 {
-        let importance_comp = (u32::MAX - self.importance).saturating_pow(2);
-        let urgency_comp = (u32::MAX - self.urgency).saturating_pow(2);
+        let importance_comp = self.importance.saturating_pow(2);
+        let urgency_comp = self.urgency.saturating_pow(2);
         (importance_comp.saturating_add(urgency_comp) as f32).sqrt().round() as u32
     }
 }
