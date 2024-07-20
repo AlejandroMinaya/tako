@@ -8,10 +8,10 @@ struct Task {
     urgency: u32
 }
 impl Task {
-    fn get_distance (&self) -> u32 {
+    fn get_distance (&self) -> f32 {
         let importance_comp = self.importance.saturating_pow(2);
         let urgency_comp = self.urgency.saturating_pow(2);
-        (importance_comp.saturating_add(urgency_comp) as f32).sqrt().round() as u32
+        (importance_comp.saturating_add(urgency_comp) as f32).sqrt()
     }
 }
 impl PartialEq for Task {
@@ -24,10 +24,17 @@ impl Ord for Task {
     fn cmp(&self, other: &Self) -> Ordering {
         let dist = self.get_distance();
         let other_dist = other.get_distance();
-        match dist.cmp(&other_dist) {
-            Ordering::Equal => self.id.cmp(&other.id),
-            other => other
+        let ordering;
+
+        if dist > other_dist {
+            ordering = Ordering::Greater;
+        } else if dist < other_dist {
+            ordering = Ordering::Less;
+        } else {
+            ordering = self.id.cmp(&other.id)
         }
+
+        return ordering;
     }
 }
 impl PartialOrd for Task {
@@ -90,7 +97,7 @@ mod test {
             urgency: u32::MAX,
             ..Default::default()
         };
-        assert_eq!(task.get_distance(), 2_u32.pow(16));
+        assert_eq!(task.get_distance(), 2_u32.pow(16) as f32);
     }
 
     #[test]
@@ -101,7 +108,7 @@ mod test {
             ..Default::default()
         };
 
-        assert_eq!(task.get_distance(), 5);
+        assert_eq!(task.get_distance(), 5 as f32);
     }
 
 
@@ -139,10 +146,10 @@ mod test {
         root.add_task(task_d);
 
         let mut task_itr = root.all_tasks.into_iter();
-        assert_eq!(Some(Box::new(task_d)), task_itr.next());
         assert_eq!(Some(Box::new(task_b)), task_itr.next());
         assert_eq!(Some(Box::new(task_c)), task_itr.next());
         assert_eq!(Some(Box::new(task_a)), task_itr.next());
+        assert_eq!(Some(Box::new(task_d)), task_itr.next());
         assert_eq!(None, task_itr.next());
     }
 }
