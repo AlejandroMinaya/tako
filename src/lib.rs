@@ -8,7 +8,7 @@ struct Task {
     urgency: u32
 }
 impl Task {
-    fn get_distance_to_max (&self) -> u32 {
+    fn get_distance (&self) -> u32 {
         let importance_comp = (u32::MAX - self.importance).saturating_pow(2);
         let urgency_comp = (u32::MAX - self.urgency).saturating_pow(2);
         (importance_comp.saturating_add(urgency_comp) as f32).sqrt().round() as u32
@@ -22,13 +22,10 @@ impl PartialEq for Task {
 impl Eq for Task {}
 impl Ord for Task {
     fn cmp(&self, other: &Self) -> Ordering {
-        // TODO: This may overflow eventually, but I understand that it is not a concern right now
-        // since we would need to reach around 2^16 tasks
-        match self.urgency.cmp(&other.urgency) {
-            Ordering::Equal => match self.importance.cmp(&other.importance) {
-                Ordering::Equal => self.id.cmp(&other.id),
-                other => other
-            },
+        let dist = self.get_distance();
+        let other_dist = other.get_distance();
+        match dist.cmp(&other_dist) {
+            Ordering::Equal => self.id.cmp(&other.id),
             other => other
         }
     }
@@ -87,24 +84,24 @@ mod test {
     }
 
     #[test]
-    fn test_distance_to_max_task() {
+    fn test_distance_to_max_task_overflow () {
         let task = Task {
             importance: u32::MAX,
             urgency: u32::MAX,
             ..Default::default()
         };
-        assert_eq!(task.get_distance_to_max(), 0);
+        assert_eq!(task.get_distance(), 2_u32.pow(16));
     }
 
     #[test]
-    fn test_distance_to_max_task_overflow () {
+    fn test_distance_to_max_task () {
         let task = Task {
-            importance: u32::MAX - 4,
-            urgency: u32::MAX - 3,
+            importance: 4,
+            urgency: 3,
             ..Default::default()
         };
 
-        assert_eq!(task.get_distance_to_max(), 5);
+        assert_eq!(task.get_distance(), 5);
     }
 
 
