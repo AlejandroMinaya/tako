@@ -7,6 +7,11 @@ struct Task {
     importance: u32,
     urgency: u32
 }
+impl Task {
+    fn get_distance_to_max (&self) -> u32 {
+        todo!();
+    }
+}
 impl PartialEq for Task {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
@@ -15,7 +20,15 @@ impl PartialEq for Task {
 impl Eq for Task {}
 impl Ord for Task {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.id.cmp(&other.id)
+        // TODO: This may overflow eventually, but I understand that it is not a concern right now
+        // since we would need to reach around 2^16 tasks
+        match self.urgency.cmp(&other.urgency) {
+            Ordering::Equal => match self.importance.cmp(&other.importance) {
+                Ordering::Equal => self.id.cmp(&other.id),
+                other => other
+            },
+            other => other
+        }
     }
 }
 impl PartialOrd for Task {
@@ -72,30 +85,49 @@ mod test {
     }
 
     #[test]
+    fn test_distance_to_max_task() {
+        let task_a = Task {
+            importance: u32::MAX,
+            urgency: u32::MAX,
+            ..Default::default()
+        };
+        let task_b = Task {
+            importance: 2_u32.pow(32) - 5,
+            urgency: 2_u32.pow(32) - 13,
+            ..Default::default()
+        };
+
+        assert_eq!(task_a.get_distance_to_max(), 0);
+        assert_eq!(task_b.get_distance_to_max(), 4);
+
+
+    }
+
+    #[test]
     fn test_multiple_sorted_importance_urgency () {
         let mut root = RootTask::default();
         let task_a = Task {
             id: 1,
-            importance: 1,
-            urgency: 4,
+            importance: 4,
+            urgency: 1,
             ..Default::default()
         };
         let task_b = Task {
             id: 2,
-            importance: 2,
-            urgency: 3,
-            ..Default::default()
-        };
-        let task_c = Task {
-            id: 3,
             importance: 3,
             urgency: 2,
             ..Default::default()
         };
+        let task_c = Task {
+            id: 3,
+            importance: 2,
+            urgency: 3,
+            ..Default::default()
+        };
         let task_d = Task {
             id: 4,
-            importance: 4,
-            urgency: 1,
+            importance: 1,
+            urgency: 4,
             ..Default::default()
         };
 
