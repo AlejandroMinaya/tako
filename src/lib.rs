@@ -199,6 +199,22 @@ mod test {
         task.subtasks.contains(&subtask);
     }
 
+    #[test]
+    fn test_add_same_id_subtask_updates_it() {
+        let mut task = Task::default();
+        let subtask = Task::default();
+        let other_subtask = Task {
+            importance: 42.0,
+            ..Default::default()
+        };
+
+        task.add_subtask(&subtask);
+        task.add_subtask(&other_subtask);
+
+        let retrieved_subtask = task.subtasks.get(&subtask);
+        assert_eq!(retrieved_subtask.expect("expected task with id = 0").importance, 42.0);
+    }
+
     /*
      * TODO: Would be too cumbersome to enforce right now
      * 2024-07-21
