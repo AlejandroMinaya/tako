@@ -50,7 +50,13 @@ impl Ord for Task<'_> {
         } else if dist < other_dist {
             ordering = Ordering::Less;
         } else {
-            ordering = self.id.cmp(&other.id)
+            let self_complexity = self.get_complexity();
+            let other_complexity = other.get_complexity();
+            if self_complexity != other_complexity {
+                ordering = self_complexity.cmp(&other_complexity);
+            } else {
+                ordering = self.id.cmp(&other.id);
+            }
         }
 
         return ordering;
