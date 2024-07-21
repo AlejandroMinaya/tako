@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::cmp::Ordering;
 
 #[derive(Debug, Default)]
-struct Task<'a> {
+pub struct Task<'a> {
     id: u32,
     importance: f32,
     urgency: f32,
@@ -27,7 +27,7 @@ impl<'a> Task<'a> {
         )
     }
 
-    fn add_subtask (&mut self, subtask: &'a Task<'a>) {
+    pub fn add_subtask (&mut self, subtask: &'a Task<'a>) {
         self.subtasks.replace(subtask);
     }
 }

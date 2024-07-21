@@ -1,3 +1,6 @@
+use tako::*;
+
 fn main () {
-    println!("tako");
+    let hello_task = Task::default();
+    println!("tako task: {:?}", hello_task);
 }
