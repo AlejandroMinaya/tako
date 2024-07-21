@@ -1,15 +1,15 @@
 use std::collections::BTreeSet;
 use std::cmp::Ordering;
 
-#[derive(Debug, Default)]
-struct Task<'a> {
+#[derive(Debug, Default, Clone)]
+struct Task {
     id: u32,
     importance: f32,
     urgency: f32,
-    subtasks: BTreeSet<&'a Task<'a>>
+    subtasks: BTreeSet<Task>
 }
 
-impl<'a> Task<'a> {
+impl Task {
     fn get_distance (&self) -> f32 {
         let importance_comp = self.importance.powf(2.0);
         let urgency_comp = self.urgency.powf(2.0);
@@ -27,17 +27,17 @@ impl<'a> Task<'a> {
         )
     }
 
-    fn add_subtask (&mut self, subtask: &'a Task<'a>) {
-        self.subtasks.insert(subtask);
+    fn add_subtask (&mut self, subtask: Self) {
+        self.subtasks.replace(subtask);
     }
 }
-impl PartialEq for Task<'_> {
+impl PartialEq for Task {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
-impl Eq for Task<'_> {}
-impl Ord for Task<'_> {
+impl Eq for Task {}
+impl Ord for Task {
     fn cmp(&self, other: &Self) -> Ordering {
         let dist = self.get_distance();
         let other_dist = other.get_distance();
@@ -54,19 +54,19 @@ impl Ord for Task<'_> {
         return ordering;
     }
 }
-impl PartialOrd for Task<'_> {
+impl PartialOrd for Task {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(&other))
     }
 }
 
 #[derive(Debug, Default)]
-struct RootTask<'a> {
-    all_tasks: BTreeSet<&'a Task<'a>>
+struct RootTask {
+    all_tasks: BTreeSet<Task>
 }
-impl<'a> RootTask<'a> {
-    fn add_task(&mut self, task: &'a Task) {
-        self.all_tasks.insert(task);
+impl RootTask {
+    fn add_task(&mut self, task: Task) {
+        self.all_tasks.replace(task);
     }
 }
 
@@ -78,7 +78,7 @@ mod test {
     fn test_add_single_task () {
         let mut root = RootTask::default();
         let task = Task::default();
-        root.add_task(&task);
+        root.add_task(task.clone());
 
         assert!(root.all_tasks.contains(&task));
     }
@@ -92,8 +92,8 @@ mod test {
             ..Default::default()
         };
 
-        root.add_task(&task);
-        root.add_task(&other_task);
+        root.add_task(task.clone());
+        root.add_task(other_task);
 
         let retrieved_task = root.all_tasks.get(&task);
         assert_eq!(retrieved_task.expect("expected task with id = 0").importance, 2.0);
@@ -115,8 +115,8 @@ mod test {
             ..Default::default()
         };
 
-        root.add_task(&task_a);
-        root.add_task(&task_b);
+        root.add_task(task_a.clone());
+        root.add_task(task_b.clone());
 
         assert!(root.all_tasks.contains(&task_a));
         assert!(root.all_tasks.contains(&task_b));
@@ -173,16 +173,16 @@ mod test {
             ..Default::default()
         };
 
-        root.all_tasks.insert(&task_a);
-        root.all_tasks.insert(&task_b);
-        root.all_tasks.insert(&task_c);
-        root.all_tasks.insert(&task_d);
+        root.all_tasks.insert(task_a.clone());
+        root.all_tasks.insert(task_b.clone());
+        root.all_tasks.insert(task_c.clone());
+        root.all_tasks.insert(task_d.clone());
 
         let mut task_itr = root.all_tasks.into_iter();
-        assert_eq!(Some(&task_b), task_itr.next());
-        assert_eq!(Some(&task_c), task_itr.next());
-        assert_eq!(Some(&task_a), task_itr.next());
-        assert_eq!(Some(&task_d), task_itr.next());
+        assert_eq!(Some(task_b), task_itr.next());
+        assert_eq!(Some(task_c), task_itr.next());
+        assert_eq!(Some(task_a), task_itr.next());
+        assert_eq!(Some(task_d), task_itr.next());
         assert_eq!(None, task_itr.next());
     }
 
@@ -194,7 +194,7 @@ mod test {
             ..Default::default()
         };
 
-        task.add_subtask(&subtask);
+        task.add_subtask(subtask.clone());
 
         task.subtasks.contains(&subtask);
     }
@@ -208,8 +208,10 @@ mod test {
             ..Default::default()
         };
 
-        task.add_subtask(&subtask);
-        task.add_subtask(&other_subtask);
+        println!("{:?}", subtask);
+        println!("{:?}", other_subtask);
+        task.add_subtask(subtask.clone());
+        task.add_subtask(other_subtask);
 
         let retrieved_subtask = task.subtasks.get(&subtask);
         assert_eq!(retrieved_subtask.expect("expected task with id = 0").importance, 42.0);
@@ -251,9 +253,9 @@ mod test {
             ..Default::default()
         };
 
-        task.add_subtask(&subtask_a);
-        task.add_subtask(&subtask_b);
-        task.add_subtask(&subtask_c);
+        task.add_subtask(subtask_a);
+        task.add_subtask(subtask_b);
+        task.add_subtask(subtask_c);
 
         assert_eq!(task.get_complexity(), 3);
     }
@@ -285,13 +287,13 @@ mod test {
             ..Default::default()
         };
 
-        subtask_d.add_subtask(&subtask_e);
+        subtask_d.add_subtask(subtask_e);
 
-        subtask_b.add_subtask(&subtask_d);
-        subtask_b.add_subtask(&subtask_c);
+        subtask_b.add_subtask(subtask_d);
+        subtask_b.add_subtask(subtask_c);
 
-        task.add_subtask(&subtask_b);
-        task.add_subtask(&subtask_a);
+        task.add_subtask(subtask_b);
+        task.add_subtask(subtask_a);
 
 
         assert_eq!(task.get_complexity(), 3);
@@ -326,11 +328,11 @@ mod test {
             ..Default::default()
         };
 
-        subtask_d.add_subtask(&subtask_e);
-        subtask_c.add_subtask(&subtask_d);
-        subtask_b.add_subtask(&subtask_c);
-        subtask_a.add_subtask(&subtask_b);
-        task.add_subtask(&subtask_a);
+        subtask_d.add_subtask(subtask_e);
+        subtask_c.add_subtask(subtask_d);
+        subtask_b.add_subtask(subtask_c);
+        subtask_a.add_subtask(subtask_b);
+        task.add_subtask(subtask_a);
 
 
         assert_eq!(task.get_complexity(), 1);
