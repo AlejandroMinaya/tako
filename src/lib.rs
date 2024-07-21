@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::cmp::Ordering;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default)]
 struct Task<'a> {
     id: u32,
     importance: f32,
@@ -16,8 +16,8 @@ impl<'a> Task<'a> {
         return if result != f32::INFINITY { result } else { f32::MAX }
     }
 
-    fn add_subtask (&mut self, subtask: &Task) {
-        todo!();
+    fn add_subtask (&mut self, subtask: &'a Task<'a>) {
+        self.subtasks.insert(subtask);
     }
 }
 impl PartialEq for Task<'_> {
