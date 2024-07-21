@@ -149,7 +149,6 @@ mod test {
 
     #[test]
     fn test_multiple_sorted_importance_urgency () {
-        let mut root = RootTask::default();
         let task_a = Task {
             id: 1,
             importance: 4.0,
@@ -174,11 +173,11 @@ mod test {
             urgency: 4.0,
             ..Default::default()
         };
+        let root = RootTask {
+            all_tasks: BTreeSet::from([&task_a, &task_b, &task_c, &task_d]),
+            ..Default::default()
+        };
 
-        root.all_tasks.insert(&task_a);
-        root.all_tasks.insert(&task_b);
-        root.all_tasks.insert(&task_c);
-        root.all_tasks.insert(&task_d);
 
         let mut task_itr = root.all_tasks.into_iter();
         assert_eq!(Some(&task_b), task_itr.next());
@@ -187,6 +186,35 @@ mod test {
         assert_eq!(Some(&task_d), task_itr.next());
         assert_eq!(None, task_itr.next());
     }
+
+    #[test]
+    fn test_same_importance_different_complexity_sort () {
+        let subtask_a = Task::default();
+        let subtask_b = Task { id: 2, ..Default::default() };
+        let task_a = Task::default();
+        let task_b = Task {
+            id: 1, 
+            subtasks: BTreeSet::from([&subtask_a, &subtask_b]),
+            ..Default::default()
+        };
+        let task_c = Task {
+            id: 2,
+            ..Default::default()
+        };
+        let root = RootTask{
+            all_tasks: BTreeSet::from([&task_a, &task_b, &task_c]),
+            ..Default::default()
+        };
+
+        let mut task_itr = root.all_tasks.into_iter();
+        assert_eq!(Some(&task_a), task_itr.next(), "Expected Task A");
+        assert_eq!(Some(&task_c), task_itr.next(), "Expected Task C");
+        assert_eq!(Some(&task_b), task_itr.next(), "Expected Task B");
+        assert_eq!(None, task_itr.next());
+
+    }
+
+
 
     #[test]
     fn test_add_subtask_to_task () {
