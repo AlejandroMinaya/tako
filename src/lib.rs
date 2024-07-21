@@ -18,7 +18,13 @@ impl<'a> Task<'a> {
     }
 
     fn get_complexity (&self) -> u32 {
-        todo!();
+        if self.subtasks.is_empty() { return 1 };
+
+        let sub_itr = self.subtasks.iter();
+        return sub_itr.fold(
+            0_u32,
+            |result, subtask| { result + subtask.get_complexity() }
+        )
     }
 
     fn add_subtask (&mut self, subtask: &'a Task<'a>) {
