@@ -11,7 +11,8 @@ impl Task {
     fn get_distance (&self) -> f32 {
         let importance_comp = self.importance.powf(2.0);
         let urgency_comp = self.urgency.powf(2.0);
-        (importance_comp + urgency_comp).sqrt()
+        let result = (importance_comp + urgency_comp).sqrt();
+        return if result != f32::INFINITY { result } else { f32::MAX }
     }
 }
 impl PartialEq for Task {
