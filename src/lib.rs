@@ -66,48 +66,29 @@ impl PartialOrd for Task<'_> {
     }
 }
 
-#[derive(Debug, Default)]
-struct RootTask<'a> {
-    all_tasks: BTreeSet<&'a Task<'a>>
-}
-impl<'a> RootTask<'a> {
-    fn add_task(&mut self, task: &'a Task) {
-        self.all_tasks.replace(task);
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
-    fn test_add_single_task () {
-        let mut root = RootTask::default();
-        let task = Task::default();
-        root.add_task(&task);
-
-        assert!(root.all_tasks.contains(&task));
-    }
-
-    #[test]
     fn test_add_same_id_task_updates_it() {
-        let mut root = RootTask::default();
         let task = Task::default();
         let other_task = Task {
             importance: 2.0,
             ..Default::default()
         };
+        let root = Task {
+            subtasks: BTreeSet::from([&task, &other_task]),
+            ..Default::default()
+        };
 
-        root.add_task(&task);
-        root.add_task(&other_task);
 
-        let retrieved_task = root.all_tasks.get(&task);
+        let retrieved_task = root.subtasks.get(&task);
         assert_eq!(retrieved_task.expect("expected task with id = 0").importance, 2.0);
     }
 
     #[test]
     fn test_add_multiple_task () {
-        let mut root = RootTask::default();
         let task_a = Task {
             id: 1,
             ..Default::default()
@@ -121,12 +102,14 @@ mod test {
             ..Default::default()
         };
 
-        root.add_task(&task_a);
-        root.add_task(&task_b);
+        let root = Task {
+            subtasks: BTreeSet::from([&task_a, &task_b]),
+            ..Default::default()
+        };
 
-        assert!(root.all_tasks.contains(&task_a));
-        assert!(root.all_tasks.contains(&task_b));
-        assert!(!root.all_tasks.contains(&task_c));
+        assert!(root.subtasks.contains(&task_a));
+        assert!(root.subtasks.contains(&task_b));
+        assert!(!root.subtasks.contains(&task_c));
     }
 
     #[test]
@@ -177,13 +160,13 @@ mod test {
             urgency: 4.0,
             ..Default::default()
         };
-        let root = RootTask {
-            all_tasks: BTreeSet::from([&task_a, &task_b, &task_c, &task_d]),
+        let root = Task {
+            subtasks: BTreeSet::from([&task_a, &task_b, &task_c, &task_d]),
             ..Default::default()
         };
 
 
-        let mut task_itr = root.all_tasks.into_iter();
+        let mut task_itr = root.subtasks.into_iter();
         assert_eq!(Some(&task_b), task_itr.next());
         assert_eq!(Some(&task_c), task_itr.next());
         assert_eq!(Some(&task_a), task_itr.next());
@@ -205,12 +188,12 @@ mod test {
             id: 2,
             ..Default::default()
         };
-        let root = RootTask{
-            all_tasks: BTreeSet::from([&task_a, &task_b, &task_c]),
+        let root = Task {
+            subtasks: BTreeSet::from([&task_a, &task_b, &task_c]),
             ..Default::default()
         };
 
-        let mut task_itr = root.all_tasks.into_iter();
+        let mut task_itr = root.subtasks.into_iter();
         assert_eq!(Some(&task_a), task_itr.next(), "Expected Task A");
         assert_eq!(Some(&task_c), task_itr.next(), "Expected Task C");
         assert_eq!(Some(&task_b), task_itr.next(), "Expected Task B");
