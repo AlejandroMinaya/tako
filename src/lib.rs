@@ -6,7 +6,7 @@ struct Task<'a> {
     id: u32,
     importance: f32,
     urgency: f32,
-    subtasks: BTreeSet<&'a Self>
+    subtasks: BTreeSet<&'a Task<'a>>
 }
 impl<'a> Task<'a> {
     fn get_distance (&self) -> f32 {
@@ -170,5 +170,21 @@ mod test {
         task.add_subtask(&subtask);
 
         task.subtasks.contains(&subtask);
+    }
+
+    #[test]
+    fn test_add_subtask_with_parent_moves_subtask () {
+        let mut task_a = Task::default();
+        let mut task_b = Task::default();
+        let subtask = Task {
+            id: 1,
+            ..Default::default()
+        };
+
+        task_a.add_subtask(&subtask);
+        task_b.add_subtask(&subtask);
+
+        assert!(!task_a.subtasks.contains(&subtask), "Subtask found in Task A");
+        assert!(task_b.subtasks.contains(&subtask), "Subtask not found in Task B");
     }
 }
