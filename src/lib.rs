@@ -4,14 +4,14 @@ use std::cmp::Ordering;
 #[derive(Debug, Default, Clone, Copy)]
 struct Task {
     id: u32,
-    importance: u32,
-    urgency: u32
+    importance: f32,
+    urgency: f32
 }
 impl Task {
     fn get_distance (&self) -> f32 {
-        let importance_comp = self.importance.saturating_pow(2);
-        let urgency_comp = self.urgency.saturating_pow(2);
-        (importance_comp.saturating_add(urgency_comp) as f32).sqrt()
+        let importance_comp = self.importance.powf(2.0);
+        let urgency_comp = self.urgency.powf(2.0);
+        (importance_comp + urgency_comp).sqrt()
     }
 }
 impl PartialEq for Task {
@@ -97,14 +97,14 @@ mod test {
             urgency: f32::MAX,
             ..Default::default()
         };
-        assert_eq!(task.get_distance(), 2_f32.powf(16.0));
+        assert_eq!(task.get_distance(), f32::MAX);
     }
 
     #[test]
     fn test_distance_to_max_task () {
         let task = Task {
-            importance: 4,
-            urgency: 3,
+            importance: 4.0,
+            urgency: 3.0,
             ..Default::default()
         };
 
@@ -117,26 +117,26 @@ mod test {
         let mut root = RootTask::default();
         let task_a = Task {
             id: 1,
-            importance: 4,
-            urgency: 1,
+            importance: 4.0,
+            urgency: 1.0,
             ..Default::default()
         };
         let task_b = Task {
             id: 2,
-            importance: 3,
-            urgency: 2,
+            importance: 3.0,
+            urgency: 2.0,
             ..Default::default()
         };
         let task_c = Task {
             id: 3,
-            importance: 2,
-            urgency: 3,
+            importance: 2.0,
+            urgency: 3.0,
             ..Default::default()
         };
         let task_d = Task {
             id: 4,
-            importance: 1,
-            urgency: 4,
+            importance: 1.0,
+            urgency: 4.0,
             ..Default::default()
         };
 
