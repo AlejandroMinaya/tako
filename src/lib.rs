@@ -84,6 +84,22 @@ mod test {
     }
 
     #[test]
+    fn test_add_same_id_task_updates_it() {
+        let mut root = RootTask::default();
+        let task = Task::default();
+        let other_task = Task {
+            importance: 2.0,
+            ..Default::default()
+        };
+
+        root.add_task(&task);
+        root.add_task(&other_task);
+
+        let retrieved_task = root.all_tasks.get(&task);
+        assert_eq!(retrieved_task.expect("expected task with id = 0").importance, 2.0);
+    }
+
+    #[test]
     fn test_add_multiple_task () {
         let mut root = RootTask::default();
         let task_a = Task {
@@ -185,6 +201,7 @@ mod test {
 
     /*
      * TODO: Would be too cumbersome to enforce right now
+     * 2024-07-21
     #[test]
     fn test_add_subtask_with_parent_moves_subtask () {
         let mut task_a = Task::default();
@@ -262,5 +279,44 @@ mod test {
 
 
         assert_eq!(task.get_complexity(), 3);
+    }
+
+    #[test]
+    fn test_get_task_complexity_multilevel_single_leaf() {
+        let mut task = Task::default();
+        // Level 1
+        let mut subtask_a = Task {
+            id: 1,
+            ..Default::default()
+        };
+        // Level 2
+        let mut subtask_b = Task {
+            id: 2,
+            ..Default::default()
+        };
+        // Level 3
+        let mut subtask_c = Task {
+            id: 3,
+            ..Default::default()
+        };
+        // Level 4
+        let mut subtask_d = Task {
+            id: 4,
+            ..Default::default()
+        };
+        // Level 5
+        let subtask_e = Task {
+            id: 3,
+            ..Default::default()
+        };
+
+        subtask_d.add_subtask(&subtask_e);
+        subtask_c.add_subtask(&subtask_d);
+        subtask_b.add_subtask(&subtask_c);
+        subtask_a.add_subtask(&subtask_b);
+        task.add_subtask(&subtask_a);
+
+
+        assert_eq!(task.get_complexity(), 1);
     }
 }
