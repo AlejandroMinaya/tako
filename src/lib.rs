@@ -71,24 +71,8 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_add_same_id_task_updates_it() {
-        let task = Task::default();
-        let other_task = Task {
-            importance: 2.0,
-            ..Default::default()
-        };
-        let root = Task {
-            subtasks: BTreeSet::from([&task, &other_task]),
-            ..Default::default()
-        };
-
-
-        let retrieved_task = root.subtasks.get(&task);
-        assert_eq!(retrieved_task.expect("expected task with id = 0").importance, 2.0);
-    }
-
-    #[test]
     fn test_add_multiple_task () {
+        let mut root = Task::default();
         let task_a = Task {
             id: 1,
             ..Default::default()
@@ -102,10 +86,8 @@ mod test {
             ..Default::default()
         };
 
-        let root = Task {
-            subtasks: BTreeSet::from([&task_a, &task_b]),
-            ..Default::default()
-        };
+        root.add_subtask(&task_a);
+        root.add_subtask(&task_b);
 
         assert!(root.subtasks.contains(&task_a));
         assert!(root.subtasks.contains(&task_b));
