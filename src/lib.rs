@@ -43,23 +43,21 @@ impl Ord for Task<'_> {
 
         let dist = self.get_distance();
         let other_dist = other.get_distance();
-        let ordering;
 
         if dist > other_dist {
-            ordering = Ordering::Greater;
-        } else if dist < other_dist {
-            ordering = Ordering::Less;
-        } else {
-            let self_complexity = self.get_complexity();
-            let other_complexity = other.get_complexity();
-            if self_complexity != other_complexity {
-                ordering = self_complexity.cmp(&other_complexity);
-            } else {
-                ordering = self.id.cmp(&other.id);
-            }
+            return Ordering::Greater;
+        }
+        if dist < other_dist {
+            return Ordering::Less;
         }
 
-        return ordering;
+        let self_complexity = self.get_complexity();
+        let other_complexity = other.get_complexity();
+        if self_complexity != other_complexity {
+            return self_complexity.cmp(&other_complexity);
+        }
+
+        return self.id.cmp(&other.id);
     }
 }
 impl PartialOrd for Task<'_> {
