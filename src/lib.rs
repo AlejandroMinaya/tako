@@ -28,7 +28,7 @@ impl<'a> Task<'a> {
     }
 
     fn add_subtask (&mut self, subtask: &'a Task<'a>) {
-        self.subtasks.insert(subtask);
+        self.subtasks.replace(subtask);
     }
 }
 impl PartialEq for Task<'_> {
@@ -39,6 +39,8 @@ impl PartialEq for Task<'_> {
 impl Eq for Task<'_> {}
 impl Ord for Task<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
+        if self == other { return Ordering::Equal }
+
         let dist = self.get_distance();
         let other_dist = other.get_distance();
         let ordering;
@@ -66,7 +68,7 @@ struct RootTask<'a> {
 }
 impl<'a> RootTask<'a> {
     fn add_task(&mut self, task: &'a Task) {
-        self.all_tasks.insert(task);
+        self.all_tasks.replace(task);
     }
 }
 
