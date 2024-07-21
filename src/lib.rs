@@ -8,12 +8,17 @@ struct Task<'a> {
     urgency: f32,
     subtasks: BTreeSet<&'a Task<'a>>
 }
+
 impl<'a> Task<'a> {
     fn get_distance (&self) -> f32 {
         let importance_comp = self.importance.powf(2.0);
         let urgency_comp = self.urgency.powf(2.0);
         let result = (importance_comp + urgency_comp).sqrt();
         return if result != f32::INFINITY { result } else { f32::MAX }
+    }
+
+    fn get_complexity (&self) -> u32 {
+        todo!();
     }
 
     fn add_subtask (&mut self, subtask: &'a Task<'a>) {
@@ -172,6 +177,8 @@ mod test {
         task.subtasks.contains(&subtask);
     }
 
+    /*
+     * TODO: Would be too cumbersome to enforce right now
     #[test]
     fn test_add_subtask_with_parent_moves_subtask () {
         let mut task_a = Task::default();
@@ -186,5 +193,68 @@ mod test {
 
         assert!(!task_a.subtasks.contains(&subtask), "Subtask found in Task A");
         assert!(task_b.subtasks.contains(&subtask), "Subtask not found in Task B");
+    }
+    */
+
+    #[test]
+    fn test_get_task_complexity_single_level() {
+        let mut task = Task::default();
+        let subtask_a = Task {
+            id: 1,
+            ..Default::default()
+        };
+        let subtask_b = Task {
+            id: 2,
+            ..Default::default()
+        };
+        let subtask_c = Task {
+            id: 3,
+            ..Default::default()
+        };
+
+        task.add_subtask(&subtask_a);
+        task.add_subtask(&subtask_b);
+        task.add_subtask(&subtask_c);
+
+        assert_eq!(task.get_complexity(), 3);
+    }
+
+    #[test]
+    fn test_get_task_complexity_multilevel() {
+        let mut task = Task::default();
+        // Level 1
+        let subtask_a = Task {
+            id: 1,
+            ..Default::default()
+        };
+        let mut subtask_b = Task {
+            id: 2,
+            ..Default::default()
+        };
+        // Level 2
+        let subtask_c = Task {
+            id: 3,
+            ..Default::default()
+        };
+        let mut subtask_d = Task {
+            id: 4,
+            ..Default::default()
+        };
+        // Level 3
+        let subtask_e = Task {
+            id: 3,
+            ..Default::default()
+        };
+
+        subtask_d.add_subtask(&subtask_e);
+
+        subtask_b.add_subtask(&subtask_d);
+        subtask_b.add_subtask(&subtask_c);
+
+        task.add_subtask(&subtask_b);
+        task.add_subtask(&subtask_a);
+
+
+        assert_eq!(task.get_complexity(), 3);
     }
 }
