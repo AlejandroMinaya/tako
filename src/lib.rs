@@ -38,7 +38,8 @@ impl<'a> Task<'a> {
     }
 
     pub fn add_subtask (&mut self, subtask: &'a Task<'a>) {
-        self.subtasks.replace(subtask);
+        self.subtasks.remove(subtask);
+        self.subtasks.insert(subtask);
     }
 
     pub fn update(&mut self, payload: Task) {
