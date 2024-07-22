@@ -41,10 +41,6 @@ impl<'a> Task<'a> {
         self.subtasks.remove(subtask);
         self.subtasks.insert(subtask);
     }
-
-    pub fn update(&mut self, payload: Task) {
-        todo!();
-    }
 }
 impl PartialEq for Task<'_> {
     fn eq(&self, other: &Self) -> bool {
@@ -172,10 +168,10 @@ mod test {
 
 
         let mut task_itr = root.subtasks.into_iter();
-        assert_eq!(Some(&task_b), task_itr.next());
-        assert_eq!(Some(&task_c), task_itr.next());
         assert_eq!(Some(&task_a), task_itr.next());
         assert_eq!(Some(&task_d), task_itr.next());
+        assert_eq!(Some(&task_b), task_itr.next());
+        assert_eq!(Some(&task_c), task_itr.next());
         assert_eq!(None, task_itr.next());
     }
 
@@ -267,9 +263,9 @@ mod test {
         root.add_subtask(&updated_task_b);
 
         let mut itr = root.subtasks.into_iter();
+        assert_eq!(Some(&task_b), itr.next(), "Expected Task B");
         assert_eq!(Some(&task_a), itr.next(), "Expected Task A");
         assert_eq!(Some(&task_c), itr.next(), "Expected Task C");
-        assert_eq!(Some(&task_b), itr.next(), "Expected Task B");
         assert_eq!(None, itr.next(), "Expected None");
         
     }
