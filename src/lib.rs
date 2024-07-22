@@ -1,5 +1,5 @@
-use std::collections::{BTreeSet, HashMap};
 use std::cmp::Ordering;
+use std::collections::{BTreeSet, HashMap};
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 enum TaskStatus {
@@ -7,7 +7,7 @@ enum TaskStatus {
     Open,
     Blocked,
     Archived,
-    Done
+    Done,
 }
 
 #[derive(Debug, Default)]
@@ -17,33 +17,36 @@ pub struct Task<'a> {
     urgency: f32,
     status: TaskStatus,
     subtasks: BTreeSet<&'a Task<'a>>,
-    subtasks_index: HashMap<u32, &'a Task<'a>>
+    subtasks_index: HashMap<u32, &'a Task<'a>>,
 }
 
 impl<'a> Task<'a> {
-    fn get_distance (&self) -> f32 {
+    fn get_distance(&self) -> f32 {
         let importance_comp = self.importance.powf(2.0);
         let urgency_comp = self.urgency.powf(2.0);
         let result = (importance_comp + urgency_comp).sqrt();
-        return if result != f32::INFINITY { result } else { f32::MAX }
+        return if result != f32::INFINITY {
+            result
+        } else {
+            f32::MAX
+        };
     }
 
-    fn get_complexity (&self) -> u32 {
-        if self.subtasks.is_empty() { return 1 };
+    fn get_complexity(&self) -> u32 {
+        if self.subtasks.is_empty() {
+            return 1;
+        };
 
         let sub_itr = self.subtasks.iter();
-        return sub_itr.fold(
-            0_u32,
-            |result, subtask| { result + subtask.get_complexity() }
-        )
+        return sub_itr.fold(0_u32, |result, subtask| result + subtask.get_complexity());
     }
 
-    pub fn add_subtask (&mut self, subtask: &'a Task<'a>) {
+    pub fn add_subtask(&mut self, subtask: &'a Task<'a>) {
         match self.subtasks_index.remove(&subtask.id) {
             Some(old_subtask) => {
                 self.subtasks.remove(old_subtask);
-            },
-            None => ()
+            }
+            None => (),
         };
         self.subtasks_index.insert(subtask.id, subtask);
         self.subtasks.insert(subtask);
@@ -57,7 +60,9 @@ impl PartialEq for Task<'_> {
 impl Eq for Task<'_> {}
 impl Ord for Task<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.id == other.id { return Ordering::Equal }
+        if self.id == other.id {
+            return Ordering::Equal;
+        }
 
         // Compare task status
         if self.status != other.status {
@@ -96,7 +101,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_add_multiple_task () {
+    fn test_add_multiple_task() {
         let mut root = Task::default();
         let task_a = Task {
             id: 1,
@@ -115,7 +120,7 @@ mod test {
     }
 
     #[test]
-    fn test_distance_to_max_task_overflow () {
+    fn test_distance_to_max_task_overflow() {
         let task = Task {
             importance: f32::MAX,
             urgency: f32::MAX,
@@ -125,7 +130,7 @@ mod test {
     }
 
     #[test]
-    fn test_distance_to_max_task () {
+    fn test_distance_to_max_task() {
         let task = Task {
             importance: 4.0,
             urgency: 3.0,
@@ -135,9 +140,8 @@ mod test {
         assert_eq!(task.get_distance(), 5.0);
     }
 
-
     #[test]
-    fn test_multiple_sorted_importance_urgency () {
+    fn test_multiple_sorted_importance_urgency() {
         let task_a = Task {
             id: 1,
             importance: 4.0,
@@ -167,7 +171,6 @@ mod test {
             ..Default::default()
         };
 
-
         let mut task_itr = root.subtasks.into_iter();
         assert_eq!(Some(&task_a), task_itr.next());
         assert_eq!(Some(&task_d), task_itr.next());
@@ -177,12 +180,15 @@ mod test {
     }
 
     #[test]
-    fn test_same_importance_different_complexity_sort () {
+    fn test_same_importance_different_complexity_sort() {
         let subtask_a = Task::default();
-        let subtask_b = Task { id: 2, ..Default::default() };
+        let subtask_b = Task {
+            id: 2,
+            ..Default::default()
+        };
         let task_a = Task::default();
         let task_b = Task {
-            id: 1, 
+            id: 1,
             subtasks: BTreeSet::from([&subtask_a, &subtask_b]),
             ..Default::default()
         };
@@ -200,11 +206,10 @@ mod test {
         assert_eq!(Some(&task_c), task_itr.next(), "Expected Task C");
         assert_eq!(Some(&task_b), task_itr.next(), "Expected Task B");
         assert_eq!(None, task_itr.next());
-
     }
 
     #[test]
-    fn test_different_status_sort () {
+    fn test_different_status_sort() {
         let task_a = Task {
             id: 4,
             ..Default::default()
@@ -270,7 +275,6 @@ mod test {
         assert_eq!(None, itr.next(), "Expected None");
     }
 
-
     #[test]
     fn test_add_same_id_subtask_updates_it() {
         let mut task = Task::default();
@@ -284,7 +288,12 @@ mod test {
         task.add_subtask(&other_subtask);
 
         let retrieved_subtask = task.subtasks.get(&subtask);
-        assert_eq!(retrieved_subtask.expect("expected task with id = 0").importance, 42.0);
+        assert_eq!(
+            retrieved_subtask
+                .expect("expected task with id = 0")
+                .importance,
+            42.0
+        );
     }
 
     /*
@@ -365,7 +374,6 @@ mod test {
         task.add_subtask(&subtask_b);
         task.add_subtask(&subtask_a);
 
-
         assert_eq!(task.get_complexity(), 3);
     }
 
@@ -404,8 +412,6 @@ mod test {
         subtask_a.add_subtask(&subtask_b);
         task.add_subtask(&subtask_a);
 
-
         assert_eq!(task.get_complexity(), 1);
     }
-
 }

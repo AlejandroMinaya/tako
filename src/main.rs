@@ -1,6 +1,6 @@
 use tako::*;
 
-fn main () {
+fn main() {
     let hello_task = Task::default();
     println!("tako task: {:?}", hello_task);
 }
