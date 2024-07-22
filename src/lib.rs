@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::cmp::Ordering;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 enum TaskStatus {
     #[default]
     Open,
@@ -49,11 +49,17 @@ impl PartialEq for Task<'_> {
 impl Eq for Task<'_> {}
 impl Ord for Task<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
+        // Compare if it is the same task
         if self == other { return Ordering::Equal }
 
+        // Compare task status
+        if self.status != other.status {
+            return self.status.cmp(&other.status);
+        }
+
+        // Compare (urgency, importance)
         let dist = self.get_distance();
         let other_dist = other.get_distance();
-
         if dist > other_dist {
             return Ordering::Greater;
         }
@@ -61,12 +67,14 @@ impl Ord for Task<'_> {
             return Ordering::Less;
         }
 
+        // Compare complexity
         let self_complexity = self.get_complexity();
         let other_complexity = other.get_complexity();
         if self_complexity != other_complexity {
             return self_complexity.cmp(&other_complexity);
         }
 
+        // Compare IDs
         return self.id.cmp(&other.id);
     }
 }
@@ -223,8 +231,8 @@ mod test {
         let mut itr = root.subtasks.into_iter();
         assert_eq!(Some(&task_a), itr.next(), "Expected Task A (Open)");
         assert_eq!(Some(&task_c), itr.next(), "Expected Task C (Blocked)");
-        assert_eq!(Some(&task_b), itr.next(), "Expected Task B (Archived)");
         assert_eq!(Some(&task_d), itr.next(), "Expected Task D (Archived)");
+        assert_eq!(Some(&task_b), itr.next(), "Expected Task B (Done)");
         assert_eq!(None, itr.next(), "Expected None");
     }
 
