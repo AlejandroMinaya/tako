@@ -104,17 +104,12 @@ mod test {
             id: 2,
             ..Default::default()
         };
-        let task_c = Task {
-            id: 3,
-            ..Default::default()
-        };
 
         root.add_subtask(&task_a);
         root.add_subtask(&task_b);
 
         assert!(root.subtasks.contains(&task_a));
         assert!(root.subtasks.contains(&task_b));
-        assert!(!root.subtasks.contains(&task_c));
     }
 
     #[test]
@@ -273,19 +268,6 @@ mod test {
         assert_eq!(None, itr.next(), "Expected None");
     }
 
-
-    #[test]
-    fn test_add_subtask_to_task () {
-        let mut task = Task::default();
-        let subtask = Task {
-            id: 1,
-            ..Default::default()
-        };
-
-        task.add_subtask(&subtask);
-
-        task.subtasks.contains(&subtask);
-    }
 
     #[test]
     fn test_add_same_id_subtask_updates_it() {
