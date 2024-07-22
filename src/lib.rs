@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::cmp::Ordering;
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
@@ -16,7 +16,8 @@ pub struct Task<'a> {
     importance: f32,
     urgency: f32,
     status: TaskStatus,
-    subtasks: BTreeSet<&'a Task<'a>>
+    subtasks: BTreeSet<&'a Task<'a>>,
+    subtasks_index: HashMap<u32, &'a Task<'a>>
 }
 
 impl<'a> Task<'a> {
@@ -38,7 +39,11 @@ impl<'a> Task<'a> {
     }
 
     pub fn add_subtask (&mut self, subtask: &'a Task<'a>) {
-        self.subtasks.remove(subtask);
+        match self.subtasks_index.get(&subtask.id) {
+            Some(old_subtask) => { self.subtasks.remove(old_subtask); },
+            None => ()
+        };
+        self.subtasks_index.insert(subtask.id, subtask);
         self.subtasks.insert(subtask);
     }
 }
@@ -50,8 +55,7 @@ impl PartialEq for Task<'_> {
 impl Eq for Task<'_> {}
 impl Ord for Task<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
-        // Compare if it is the same task
-        if self == other { return Ordering::Equal }
+        if self.id == other.id { return Ordering::Equal }
 
         // Compare task status
         if self.status != other.status {
@@ -62,10 +66,10 @@ impl Ord for Task<'_> {
         let dist = self.get_distance();
         let other_dist = other.get_distance();
         if dist > other_dist {
-            return Ordering::Greater;
+            return Ordering::Less;
         }
         if dist < other_dist {
-            return Ordering::Less;
+            return Ordering::Greater;
         }
 
         // Compare complexity
@@ -267,7 +271,6 @@ mod test {
         assert_eq!(Some(&task_a), itr.next(), "Expected Task A");
         assert_eq!(Some(&task_c), itr.next(), "Expected Task C");
         assert_eq!(None, itr.next(), "Expected None");
-        
     }
 
 
