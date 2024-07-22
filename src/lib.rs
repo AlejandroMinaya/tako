@@ -39,8 +39,10 @@ impl<'a> Task<'a> {
     }
 
     pub fn add_subtask (&mut self, subtask: &'a Task<'a>) {
-        match self.subtasks_index.get(&subtask.id) {
-            Some(old_subtask) => { self.subtasks.remove(old_subtask); },
+        match self.subtasks_index.remove(&subtask.id) {
+            Some(old_subtask) => {
+                self.subtasks.remove(old_subtask);
+            },
             None => ()
         };
         self.subtasks_index.insert(subtask.id, subtask);
