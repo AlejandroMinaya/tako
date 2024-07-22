@@ -40,6 +40,10 @@ impl<'a> Task<'a> {
     pub fn add_subtask (&mut self, subtask: &'a Task<'a>) {
         self.subtasks.replace(subtask);
     }
+
+    pub fn update(&mut self, payload: Task) {
+        todo!();
+    }
 }
 impl PartialEq for Task<'_> {
     fn eq(&self, other: &Self) -> bool {
@@ -236,12 +240,38 @@ mod test {
         assert_eq!(None, itr.next(), "Expected None");
     }
 
-    /* TODO
     #[test]
     fn test_reinsert_into_correct_position_after_update() {
+        let task_a = Task::default();
+        let task_b = Task {
+            id: 1,
+            ..Default::default()
+        };
+        let task_c = Task {
+            id: 2,
+            ..Default::default()
+        };
+        let mut root = Task {
+            subtasks: BTreeSet::from([&task_a, &task_b, &task_c]),
+            ..Default::default()
+        };
+
+        let updated_task_b = Task {
+            id: 1,
+            importance: 10.0,
+            urgency: 10.0,
+            ..Default::default()
+        };
+
+        root.add_subtask(&updated_task_b);
+
+        let mut itr = root.subtasks.into_iter();
+        assert_eq!(Some(&task_a), itr.next(), "Expected Task A");
+        assert_eq!(Some(&task_c), itr.next(), "Expected Task C");
+        assert_eq!(Some(&task_b), itr.next(), "Expected Task B");
+        assert_eq!(None, itr.next(), "Expected None");
         
     }
-    */
 
 
     #[test]
