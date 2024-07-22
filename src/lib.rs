@@ -2,10 +2,20 @@ use std::collections::BTreeSet;
 use std::cmp::Ordering;
 
 #[derive(Debug, Default)]
+enum TaskStatus {
+    #[default]
+    Open,
+    Blocked,
+    Archived,
+    Done
+}
+
+#[derive(Debug, Default)]
 pub struct Task<'a> {
     id: u32,
     importance: f32,
     urgency: f32,
+    status: TaskStatus,
     subtasks: BTreeSet<&'a Task<'a>>
 }
 
@@ -183,6 +193,47 @@ mod test {
 
     }
 
+    #[test]
+    fn test_different_status_sort () {
+        let task_a = Task {
+            id: 4,
+            ..Default::default()
+        };
+        let task_b = Task {
+            id: 3,
+            status: TaskStatus::Done,
+            ..Default::default()
+        };
+        let task_c = Task {
+            id: 2,
+            status: TaskStatus::Blocked,
+            ..Default::default()
+        };
+        let task_d = Task {
+            id: 1,
+            status: TaskStatus::Archived,
+            ..Default::default()
+        };
+
+        let root = Task {
+            subtasks: BTreeSet::from([&task_a, &task_b, &task_c, &task_d]),
+            ..Default::default()
+        };
+
+        let mut itr = root.subtasks.into_iter();
+        assert_eq!(Some(&task_a), itr.next(), "Expected Task A (Open)");
+        assert_eq!(Some(&task_c), itr.next(), "Expected Task C (Blocked)");
+        assert_eq!(Some(&task_b), itr.next(), "Expected Task B (Archived)");
+        assert_eq!(Some(&task_d), itr.next(), "Expected Task D (Archived)");
+        assert_eq!(None, itr.next(), "Expected None");
+    }
+
+    /* TODO
+    #[test]
+    fn test_reinsert_into_correct_position_after_update() {
+        
+    }
+    */
 
 
     #[test]
@@ -334,4 +385,5 @@ mod test {
 
         assert_eq!(task.get_complexity(), 1);
     }
+
 }
