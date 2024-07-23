@@ -449,6 +449,10 @@ impl Oswald {
             root: Task::default(),
         }
     }
+    fn add_task(&mut self, task: Box<Task>) {
+        todo!();
+    }
+
     fn load(&mut self) {
         self.data_store
             .read()
@@ -493,6 +497,16 @@ mod oswald_tests {
             .unwrap()
             .subtasks_map
             .contains_key(&5));
+    }
+
+    #[test]
+    fn test_add_task() {
+        let mut oswald = Oswald::new(Box::new(test::MockDataStore::default()));
+        let task = Box::new(Task::new_with_id(1));
+
+        oswald.add_task(task);
+
+        assert!(oswald.root.subtasks_map.contains_key(&1));
     }
 }
 
