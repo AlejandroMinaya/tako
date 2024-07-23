@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{hash_map::Entry, BTreeSet, HashMap};
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone)]
 enum TaskStatus {
@@ -11,16 +11,21 @@ enum TaskStatus {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct Task<'a> {
+pub struct Task {
     pub id: u32,
     pub importance: f32,
     pub urgency: f32,
-    pub status: TaskStatus,
-    subtasks_tree: BTreeSet<&'a Task<'a>>,
-    subtasks_tree_map: HashMap<u32, Box<Task<'a>>>,
+    status: TaskStatus,
+    subtasks_map: HashMap<u32, Box<Self>>,
 }
 
-impl<'a> Task<'a> {
+impl Task {
+    pub fn new_with_id(id: u32) -> Self {
+        Task {
+            id,
+            ..Default::default()
+        }
+    }
     fn get_distance(&self) -> f32 {
         let importance_comp = self.importance.powf(2.0);
         let urgency_comp = self.urgency.powf(2.0);
@@ -33,36 +38,36 @@ impl<'a> Task<'a> {
     }
 
     fn get_complexity(&self) -> u32 {
-        if self.subtasks_tree.is_empty() {
+        if self.subtasks_map.is_empty() {
             return 1;
         };
 
-        let sub_itr = self.subtasks_tree.iter();
+        let sub_itr = self.subtasks_map.values();
         return sub_itr.fold(0_u32, |result, subtask| result + subtask.get_complexity());
     }
 
-    pub fn add_subtask(&'a mut self, subtask: Box<Task<'a>>) {
-        let subtask_id = subtask.id;
-        match self.subtasks_tree_map.insert(subtask_id, subtask) {
-            Some(old_subtask) => {
-                self.subtasks_tree.remove(old_subtask.as_ref());
-            }
-            None => (),
-        };
-        let new_subtask_ref = self
-            .subtasks_tree_map
-            .get(&subtask_id)
-            .expect("Expected Task #{subtask_id}");
-        self.subtasks_tree.insert(new_subtask_ref);
+    pub fn add_subtask(&mut self, subtask: Box<Self>) {
+        self.subtasks_map.insert(subtask.id, subtask);
+    }
+
+    pub fn get_subtasks(&self) -> Vec<&Self> {
+        // TODO (maybe): Cache vector and only sort after insertion/deletion to the map, instead of each time
+        let mut collected_subtasks: Vec<&Self> = self
+            .subtasks_map
+            .values()
+            .map(|boxed_task| boxed_task.as_ref())
+            .collect();
+        collected_subtasks.sort();
+        return collected_subtasks;
     }
 }
-impl PartialEq for Task<'_> {
+impl PartialEq for Task {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
-impl Eq for Task<'_> {}
-impl Ord for Task<'_> {
+impl Eq for Task {}
+impl Ord for Task {
     fn cmp(&self, other: &Self) -> Ordering {
         if self.id == other.id {
             return Ordering::Equal;
@@ -94,7 +99,7 @@ impl Ord for Task<'_> {
         return self.id.cmp(&other.id);
     }
 }
-impl PartialOrd for Task<'_> {
+impl PartialOrd for Task {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(&other))
     }
@@ -119,8 +124,8 @@ mod test {
         root.add_subtask(task_a.clone());
         root.add_subtask(task_b.clone());
 
-        assert!(root.subtasks_tree.contains(task_a.as_ref()));
-        assert!(root.subtasks_tree.contains(task_b.as_ref()));
+        assert!(root.subtasks_map.contains_key(&1));
+        assert!(root.subtasks_map.contains_key(&2));
     }
 
     #[test]
@@ -177,7 +182,7 @@ mod test {
         root.add_subtask(task_c);
         root.add_subtask(task_d);
 
-        let mut task_itr = root.subtasks_tree.into_iter();
+        let mut task_itr = root.get_subtasks().into_iter();
         assert_eq!(task_itr.next().expect("Expected Task A").id, 1);
         assert_eq!(task_itr.next().expect("Expected Task D").id, 4);
         assert_eq!(task_itr.next().expect("Expected Task B").id, 2);
@@ -210,7 +215,7 @@ mod test {
         root.add_subtask(task_b);
         root.add_subtask(task_c);
 
-        let mut task_itr = root.subtasks_tree.into_iter();
+        let mut task_itr = root.get_subtasks().into_iter();
         assert_eq!(task_itr.next().expect("Expected Task A").id, 0);
         assert_eq!(task_itr.next().expect("Expected Task C").id, 2);
         assert_eq!(task_itr.next().expect("Expected Task B").id, 1);
@@ -245,7 +250,7 @@ mod test {
         root.add_subtask(task_c);
         root.add_subtask(task_d);
 
-        let mut itr = root.subtasks_tree.into_iter();
+        let mut itr = root.get_subtasks().into_iter();
         assert_eq!(itr.next().expect("Expected Task A (Open)").id, 4);
         assert_eq!(itr.next().expect("Expected Task C (Blocked)").id, 2);
         assert_eq!(itr.next().expect("Expected Task D (Archived)").id, 1);
@@ -278,7 +283,7 @@ mod test {
         root.add_subtask(task_c);
         root.add_subtask(updated_task_b);
 
-        let mut itr = root.subtasks_tree.into_iter();
+        let mut itr = root.get_subtasks().into_iter();
         assert_eq!(itr.next().expect("Expected Task B").id, 1);
         assert_eq!(itr.next().expect("Expected Task A").id, 0);
         assert_eq!(itr.next().expect("Expected Task C").id, 2);
@@ -297,7 +302,7 @@ mod test {
         task.add_subtask(subtask);
         task.add_subtask(other_subtask.clone());
 
-        let mut itr = task.subtasks_tree.into_iter();
+        let mut itr = task.get_subtasks().into_iter();
         let retrieved_subtask = itr.next();
         assert_eq!(
             retrieved_subtask
@@ -322,8 +327,8 @@ mod test {
         task_a.add_subtask(&subtask);
         task_b.add_subtask(&subtask);
 
-        assert!(!task_a.subtasks_tree.contains(&subtask), "Subtask found in Task A");
-        assert!(task_b.subtasks_tree.contains(&subtask), "Subtask not found in Task B");
+        assert!(!task_a.get_subtasks().contains(&subtask), "Subtask found in Task A");
+        assert!(task_b.get_subtasks().contains(&subtask), "Subtask not found in Task B");
     }
     */
 
