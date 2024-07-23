@@ -53,8 +53,7 @@ pub mod test {
 
             task_a.add_subtask(subtask_a);
 
-            task_c.add_subtask(subtask_b);
-            task_c.add_subtask(subtask_c);
+            task_c.add_subtask(subtask_b).add_subtask(subtask_c);
 
             let test_tasks = vec![task_a, task_b, task_c];
             test_tasks.into_iter()

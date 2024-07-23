@@ -16,8 +16,8 @@ pub struct Task<'a> {
     pub importance: f32,
     pub urgency: f32,
     pub status: TaskStatus,
-    subtasks_tree: BTreeSet<&'a Task<'a>>,
-    subtasks_tree_map: HashMap<u32, Box<Task<'a>>>,
+    subtasks_tree: BTreeSet<&'a Self>,
+    subtasks_map: HashMap<u32, Box<Self>>,
 }
 
 impl<'a> Task<'a> {
@@ -41,19 +41,20 @@ impl<'a> Task<'a> {
         return sub_itr.fold(0_u32, |result, subtask| result + subtask.get_complexity());
     }
 
-    pub fn add_subtask(&'a mut self, subtask: Box<Task<'a>>) {
+    pub fn add_subtask(&'a mut self, subtask: Box<Self>) -> &mut Self {
         let subtask_id = subtask.id;
-        match self.subtasks_tree_map.insert(subtask_id, subtask) {
+        match self.subtasks_map.insert(subtask_id, subtask) {
             Some(old_subtask) => {
                 self.subtasks_tree.remove(old_subtask.as_ref());
             }
             None => (),
         };
-        let new_subtask_ref = self
-            .subtasks_tree_map
-            .get(&subtask_id)
-            .expect("Expected Task #{subtask_id}");
-        self.subtasks_tree.insert(new_subtask_ref);
+        self.subtasks_tree.insert(
+            self.subtasks_map
+                .get(&subtask_id)
+                .expect("Expected new task #{subtasks_id}"),
+        );
+        self
     }
 }
 impl PartialEq for Task<'_> {
@@ -116,8 +117,7 @@ mod test {
             ..Default::default()
         });
 
-        root.add_subtask(task_a.clone());
-        root.add_subtask(task_b.clone());
+        root.add_subtask(task_a.clone()).add_subtask(task_b.clone());
 
         assert!(root.subtasks_tree.contains(task_a.as_ref()));
         assert!(root.subtasks_tree.contains(task_b.as_ref()));
@@ -172,10 +172,10 @@ mod test {
             ..Default::default()
         });
 
-        root.add_subtask(task_a);
-        root.add_subtask(task_b);
-        root.add_subtask(task_c);
-        root.add_subtask(task_d);
+        root.add_subtask(task_a)
+            .add_subtask(task_b)
+            .add_subtask(task_c)
+            .add_subtask(task_d);
 
         let mut task_itr = root.subtasks_tree.into_iter();
         assert_eq!(task_itr.next().expect("Expected Task A").id, 1);
@@ -203,12 +203,11 @@ mod test {
             ..Default::default()
         });
 
-        task_b.add_subtask(subtask_a);
-        task_b.add_subtask(subtask_b);
+        task_b.add_subtask(subtask_a).add_subtask(subtask_b);
 
-        root.add_subtask(task_a);
-        root.add_subtask(task_b);
-        root.add_subtask(task_c);
+        root.add_subtask(task_a)
+            .add_subtask(task_b)
+            .add_subtask(task_c);
 
         let mut task_itr = root.subtasks_tree.into_iter();
         assert_eq!(task_itr.next().expect("Expected Task A").id, 0);
@@ -240,10 +239,10 @@ mod test {
             ..Default::default()
         });
 
-        root.add_subtask(task_a);
-        root.add_subtask(task_b);
-        root.add_subtask(task_c);
-        root.add_subtask(task_d);
+        root.add_subtask(task_a)
+            .add_subtask(task_b)
+            .add_subtask(task_c)
+            .add_subtask(task_d);
 
         let mut itr = root.subtasks_tree.into_iter();
         assert_eq!(itr.next().expect("Expected Task A (Open)").id, 4);
@@ -273,10 +272,10 @@ mod test {
             ..Default::default()
         });
 
-        root.add_subtask(task_a);
-        root.add_subtask(task_b);
-        root.add_subtask(task_c);
-        root.add_subtask(updated_task_b);
+        root.add_subtask(task_a)
+            .add_subtask(task_b)
+            .add_subtask(task_c)
+            .add_subtask(updated_task_b);
 
         let mut itr = root.subtasks_tree.into_iter();
         assert_eq!(itr.next().expect("Expected Task B").id, 1);
@@ -294,8 +293,7 @@ mod test {
             ..Default::default()
         });
 
-        task.add_subtask(subtask);
-        task.add_subtask(other_subtask.clone());
+        task.add_subtask(subtask).add_subtask(other_subtask.clone());
 
         let mut itr = task.subtasks_tree.into_iter();
         let retrieved_subtask = itr.next();
@@ -343,9 +341,9 @@ mod test {
             ..Default::default()
         });
 
-        task.add_subtask(subtask_a);
-        task.add_subtask(subtask_b);
-        task.add_subtask(subtask_c);
+        task.add_subtask(subtask_a)
+            .add_subtask(subtask_b)
+            .add_subtask(subtask_c);
 
         assert_eq!(task.get_complexity(), 3);
     }
@@ -379,11 +377,9 @@ mod test {
 
         subtask_d.add_subtask(subtask_e);
 
-        subtask_b.add_subtask(subtask_d);
-        subtask_b.add_subtask(subtask_c);
+        subtask_b.add_subtask(subtask_d).add_subtask(subtask_c);
 
-        task.add_subtask(subtask_b);
-        task.add_subtask(subtask_a);
+        task.add_subtask(subtask_b).add_subtask(subtask_a);
 
         assert_eq!(task.get_complexity(), 3);
     }
@@ -421,8 +417,8 @@ mod test {
         subtask_c.add_subtask(subtask_d);
         subtask_b.add_subtask(subtask_c);
         subtask_a.add_subtask(subtask_b);
-        task.add_subtask(subtask_a);
+        let complexity = task.add_subtask(subtask_a).get_complexity();
 
-        assert_eq!(task.get_complexity(), 1);
+        assert_eq!(complexity, 1);
     }
 }
