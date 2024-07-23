@@ -453,9 +453,10 @@ impl Oswald {
         self.root.add_subtask(task)
     }
 
-    fn load(&mut self) {
+    async fn load(&mut self) {
         self.data_store
             .read()
+            .await
             .for_each(|boxed_task| self.root.add_subtask(boxed_task))
     }
 }
@@ -466,11 +467,11 @@ mod oswald_tests {
     use super::*;
     use crate::core::ports::test;
 
-    #[test]
-    fn test_load_all_tasks_from_data_store() {
+    #[sqlx::test]
+    async fn test_load_all_tasks_from_data_store() {
         let mut oswald = Oswald::new(Box::new(test::MockDataStore::default()));
 
-        oswald.load();
+        oswald.load().await;
 
         assert!(oswald.root.subtasks_map.contains_key(&0));
         assert!(oswald.root.subtasks_map.contains_key(&1));

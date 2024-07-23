@@ -1,10 +1,12 @@
 use crate::core::tasks::*;
 use std::fmt::Debug;
 use std::vec::IntoIter;
+use async_trait::async_trait;
 
+#[async_trait]
 pub trait DataStore: Debug {
-    fn write(&self, task_itr: IntoIter<&Task>) -> bool;
-    fn read(&self) -> IntoIter<Box<Task>>;
+    async fn write(&self, task_itr: IntoIter<&Task>) -> bool;
+    async fn read(&self) -> IntoIter<Box<Task>>;
 }
 
 #[cfg(test)]
@@ -16,11 +18,12 @@ pub mod test {
         write_return_val: bool,
     }
 
+    #[async_trait]
     impl DataStore for MockDataStore {
-        fn write(&self, _task_itr: IntoIter<&Task>) -> bool {
+        async fn write(&self, _task_itr: IntoIter<&Task>) -> bool {
             self.write_return_val
         }
-        fn read(&self) -> IntoIter<Box<Task>> {
+        async fn read(&self) -> IntoIter<Box<Task>> {
             let mut task_a = Box::new(Task::new_with_id(0));
             let task_b = Box::new(Task::new_with_id(1));
             let mut task_c = Box::new(Task::new_with_id(2));
