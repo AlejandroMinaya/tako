@@ -450,7 +450,7 @@ impl Oswald {
         }
     }
     fn add_task(&mut self, task: Box<Task>) {
-        todo!();
+        self.root.add_subtask(task)
     }
 
     fn load(&mut self) {
