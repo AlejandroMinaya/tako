@@ -450,7 +450,9 @@ impl Oswald {
         }
     }
     fn load(&mut self) {
-        todo!();
+        self.data_store
+            .read()
+            .for_each(|boxed_task| self.root.add_subtask(boxed_task))
     }
 }
 
