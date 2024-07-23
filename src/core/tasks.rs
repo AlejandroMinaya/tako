@@ -1,6 +1,8 @@
+use crate::core::ports::*;
 use std::cmp::Ordering;
-use std::collections::{hash_map::Entry, BTreeSet, HashMap};
+use std::collections::HashMap;
 
+/* TASK STATUS ============================================================= */
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone)]
 enum TaskStatus {
     #[default]
@@ -10,6 +12,7 @@ enum TaskStatus {
     Done,
 }
 
+/* TASK ==================================================================== */
 #[derive(Debug, Default, Clone)]
 pub struct Task {
     pub id: u32,
@@ -106,7 +109,7 @@ impl PartialOrd for Task {
 }
 
 #[cfg(test)]
-mod test {
+mod task_tests {
     use super::*;
 
     #[test]
@@ -431,3 +434,64 @@ mod test {
         assert_eq!(task.get_complexity(), 1);
     }
 }
+
+/* OSWALD (TASK SERVICE) =================================================== */
+// https://www.imdb.com/title/tt0293734/
+#[derive(Debug)]
+struct Oswald {
+    data_store: Box<dyn DataStore>,
+    root: Task,
+}
+impl Oswald {
+    fn new(data_store: Box<dyn DataStore>) -> Self {
+        Oswald {
+            data_store,
+            root: Task::default(),
+        }
+    }
+    fn load(&mut self) {
+        todo!();
+    }
+}
+
+/* TESTS =================================================================== */
+#[cfg(test)]
+mod oswald_tests {
+    use super::*;
+    use crate::core::ports::test;
+
+    #[test]
+    fn test_load_all_tasks_from_data_store() {
+        let mut oswald = Oswald::new(Box::new(test::MockDataStore::default()));
+
+        oswald.load();
+
+        assert!(oswald.root.subtasks_map.contains_key(&0));
+        assert!(oswald.root.subtasks_map.contains_key(&1));
+        assert!(oswald.root.subtasks_map.contains_key(&2));
+
+        assert!(oswald
+            .root
+            .subtasks_map
+            .get(&0)
+            .unwrap()
+            .subtasks_map
+            .contains_key(&3));
+        assert!(oswald
+            .root
+            .subtasks_map
+            .get(&2)
+            .unwrap()
+            .subtasks_map
+            .contains_key(&4));
+        assert!(oswald
+            .root
+            .subtasks_map
+            .get(&2)
+            .unwrap()
+            .subtasks_map
+            .contains_key(&5));
+    }
+}
+
+/* ========================================================================= */

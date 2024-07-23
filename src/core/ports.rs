@@ -1,7 +1,8 @@
 use crate::core::tasks::*;
+use std::fmt::Debug;
 use std::vec::IntoIter;
 
-pub trait DataStore {
+pub trait DataStore: Debug {
     fn write(&self, task_itr: IntoIter<&Task>) -> bool;
     fn write_task(&self, task: &Task) -> bool;
     fn read(&self) -> IntoIter<Box<Task>>;
@@ -12,7 +13,7 @@ pub trait DataStore {
 pub mod test {
     use super::*;
 
-    #[derive(Default)]
+    #[derive(Debug, Default)]
     pub struct MockDataStore {
         write_return_val: bool,
         write_task_return_val: bool,
