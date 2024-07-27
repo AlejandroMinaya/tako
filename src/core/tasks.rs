@@ -3,26 +3,55 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 
 /* TASK STATUS ============================================================= */
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone)]
-enum TaskStatus {
+#[derive(
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Clone,
+)]
+#[repr(u8)]
+pub enum TaskStatus {
     #[default]
-    Open,
-    Blocked,
-    Archived,
-    Done,
+    Open = 1,
+    Blocked = 253,
+    Archived = 254,
+    Done = 255,
+}
+impl Into<TaskStatus> for i32 {
+    fn into(self) -> TaskStatus {
+        match self {
+            253 => TaskStatus::Blocked,
+            254 => TaskStatus::Archived,
+            255 => TaskStatus::Done,
+            _ => TaskStatus::Open,
+
+        }
+    }
 }
 
 /* TASK ==================================================================== */
 #[derive(Debug, Default, Clone)]
 pub struct Task {
-    pub id: u32,
-    pub importance: f32,
-    pub urgency: f32,
+    id: u32,
+    importance: f32,
+    urgency: f32,
     status: TaskStatus,
     subtasks_map: HashMap<u32, Box<Self>>,
 }
 
 impl Task {
+    pub fn new(id: u32, importance: f32, urgency: f32, status: TaskStatus) -> Self {
+        Task {
+            id,
+            importance,
+            urgency,
+            status,
+            subtasks_map: HashMap::new()
+        }
+    }
     pub fn new_with_id(id: u32) -> Self {
         Task {
             id,
@@ -453,11 +482,12 @@ impl Oswald {
         self.root.add_subtask(task)
     }
 
-    async fn load(&mut self) {
+    async fn load(&mut self) -> anyhow::Result<()> {
         self.data_store
             .read()
-            .await
-            .for_each(|boxed_task| self.root.add_subtask(boxed_task))
+            .await?
+            .for_each(|boxed_task| self.root.add_subtask(boxed_task));
+        Ok(())
     }
 }
 

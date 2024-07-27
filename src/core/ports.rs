@@ -6,7 +6,7 @@ use async_trait::async_trait;
 #[async_trait]
 pub trait DataStore: Debug {
     async fn write(&self, task_itr: IntoIter<&Task>) -> bool;
-    async fn read(&self) -> IntoIter<Box<Task>>;
+    async fn read(&self) -> anyhow::Result<IntoIter<Box<Task>>>;
 }
 
 #[cfg(test)]
@@ -23,7 +23,7 @@ pub mod test {
         async fn write(&self, _task_itr: IntoIter<&Task>) -> bool {
             self.write_return_val
         }
-        async fn read(&self) -> IntoIter<Box<Task>> {
+        async fn read(&self) -> anyhow::Result<IntoIter<Box<Task>>> {
             let mut task_a = Box::new(Task::new_with_id(0));
             let task_b = Box::new(Task::new_with_id(1));
             let mut task_c = Box::new(Task::new_with_id(2));
@@ -36,7 +36,7 @@ pub mod test {
             task_c.add_subtask(subtask_c);
 
             let test_tasks = vec![task_a, task_b, task_c];
-            test_tasks.into_iter()
+            Ok(test_tasks.into_iter())
         }
     }
 }
