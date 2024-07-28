@@ -135,7 +135,19 @@ impl Task {
         return collected_subtasks;
     }
     pub fn get_all_subtasks(&self) -> Vec<&Self> {
-        todo!();
+        let mut all_subtasks: Vec<&Self> = vec![];
+        if self.subtasks_map.len() == 0 {
+            return all_subtasks;
+        }
+        self.subtasks_map.values().for_each(|subtask| {
+            let mut microtasks = subtask.get_all_subtasks();
+            all_subtasks.append(&mut microtasks);
+        });
+        self.subtasks_map.values().for_each(|subtask| {
+            all_subtasks.push(&subtask);
+        });
+        all_subtasks.sort();
+        return all_subtasks
     }
 }
 impl PartialEq for Task {
@@ -543,12 +555,13 @@ mod task_tests {
         root.add_subtask(task_b);
 
         let mut itr = root.get_all_subtasks().into_iter();
-        assert_eq!(itr.next().expect("Expected Task #6").id, 6);
-        assert_eq!(itr.next().expect("Expected Task #7").id, 7);
         assert_eq!(itr.next().expect("Expected Task #3").id, 3);
         assert_eq!(itr.next().expect("Expected Task #5").id, 5);
+        assert_eq!(itr.next().expect("Expected Task #6").id, 6);
+        assert_eq!(itr.next().expect("Expected Task #7").id, 7);
         assert_eq!(itr.next().expect("Expected Task #1").id, 1);
         assert_eq!(itr.next().expect("Expected Task #2").id, 2);
+        assert_eq!(itr.next().expect("Expected Task #4").id, 4);
         assert_eq!(itr.next(), None);
 
     }
