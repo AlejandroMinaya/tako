@@ -1,5 +1,8 @@
-use crate::ports::*;
-use crate::core::tasks::*;
+use crate::core::tasks::{
+    Task,
+    TaskStatus,
+    ports::DataStore
+};
 use async_trait::async_trait;
 use sqlx::{
     query_as,
@@ -18,13 +21,14 @@ use sqlx::{
 };
 use std::vec::IntoIter;
 
+
 #[derive(Debug)]
-struct SQLiteStore {
+pub struct SQLiteStore {
     conn: String,
 }
 
 impl SQLiteStore {
-    fn new(conn: String) -> Self {
+    pub fn new(conn: String) -> Self {
         SQLiteStore { conn }
     }
 }

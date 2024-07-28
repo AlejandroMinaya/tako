@@ -1,17 +1,12 @@
-use crate::core::tasks::*;
-use std::fmt::Debug;
-use std::vec::IntoIter;
 use async_trait::async_trait;
 
-#[async_trait]
-pub trait DataStore: Debug {
-    async fn write(&self, task_itr: IntoIter<&Task>) -> bool;
-    async fn read(&self) -> anyhow::Result<IntoIter<Box<Task>>>;
-}
 
 #[cfg(test)]
 pub mod test {
     use super::*;
+    use std::vec::IntoIter;
+    use crate::core::tasks::Task;
+    use crate::core::tasks::ports::DataStore;
 
     #[derive(Debug, Default)]
     pub struct MockDataStore {

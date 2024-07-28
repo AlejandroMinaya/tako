@@ -1,6 +1,20 @@
-use crate::core::ports::*;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+
+
+pub mod ports {
+    use async_trait::async_trait;
+    use std::vec::IntoIter;
+    use super::Task;
+    use std::fmt::Debug;
+
+    #[async_trait]
+    pub trait DataStore: Debug {
+        async fn write(&self, task_itr: IntoIter<&Task>) -> bool;
+        async fn read(&self) -> anyhow::Result<IntoIter<Box<Task>>>;
+    }
+}
+
 
 /* TASK STATUS ============================================================= */
 #[derive(
@@ -467,18 +481,18 @@ mod task_tests {
 /* OSWALD (TASK SERVICE) =================================================== */
 // https://www.imdb.com/title/tt0293734/
 #[derive(Debug)]
-struct Oswald {
-    data_store: Box<dyn DataStore>,
+pub struct Oswald {
+    data_store: Box<dyn ports::DataStore>,
     root: Task,
 }
 impl Oswald {
-    fn new(data_store: Box<dyn DataStore>) -> Self {
+    pub fn new(data_store: Box<dyn ports::DataStore>) -> Self {
         Oswald {
             data_store,
             root: Task::default(),
         }
     }
-    fn add_task(&mut self, task: Box<Task>) {
+    pub fn add_task(&mut self, task: Box<Task>) {
         self.root.add_subtask(task)
     }
 
@@ -495,13 +509,13 @@ impl Oswald {
 #[cfg(test)]
 mod oswald_tests {
     use super::*;
-    use crate::core::ports::test;
+    use crate::ports::test;
 
     #[sqlx::test]
     async fn test_load_all_tasks_from_data_store() {
         let mut oswald = Oswald::new(Box::new(test::MockDataStore::default()));
 
-        oswald.load().await;
+        let _ = oswald.load().await;
 
         assert!(oswald.root.subtasks_map.contains_key(&0));
         assert!(oswald.root.subtasks_map.contains_key(&1));
