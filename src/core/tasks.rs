@@ -21,6 +21,14 @@ pub mod ports {
             self.write_return_val
         }
         async fn read(&self) -> anyhow::Result<IntoIter<Box<Task>>> {
+            /*
+             *                (r)
+             *              /  |  \
+             *             /   |   \
+             *          (tA) (tB) (tC)
+             *           |       /   \
+             *         (sA)    (sB) (sC)
+             */
             let mut task_a = Box::new(Task::new_with_id(0));
             let task_b = Box::new(Task::new_with_id(1));
             let mut task_c = Box::new(Task::new_with_id(2));
@@ -282,20 +290,11 @@ mod task_tests {
     #[test]
     fn test_same_importance_different_complexity_sort() {
         let mut root = Task::default();
-        let mut task_b = Box::new(Task {
-            id: 1,
-            ..Default::default()
-        });
-        let subtask_a = Box::new(Task::default());
-        let subtask_b = Box::new(Task {
-            id: 2,
-            ..Default::default()
-        });
-        let task_a = Box::new(Task::default());
-        let task_c = Box::new(Task {
-            id: 2,
-            ..Default::default()
-        });
+        let mut task_b = Box::new(Task::new_with_id(2));
+        let subtask_a = Box::new(Task::new_with_id(4));
+        let subtask_b = Box::new(Task::new_with_id(5));
+        let task_a = Box::new(Task::new_with_id(1));
+        let task_c = Box::new(Task::new_with_id(3));
 
         task_b.add_subtask(subtask_a);
         task_b.add_subtask(subtask_b);
@@ -305,9 +304,9 @@ mod task_tests {
         root.add_subtask(task_c);
 
         let mut task_itr = root.get_subtasks().into_iter();
-        assert_eq!(task_itr.next().expect("Expected Task A").id, 0);
-        assert_eq!(task_itr.next().expect("Expected Task C").id, 2);
-        assert_eq!(task_itr.next().expect("Expected Task B").id, 1);
+        assert_eq!(task_itr.next().expect("Expected Task A").id, 1);
+        assert_eq!(task_itr.next().expect("Expected Task C").id, 3);
+        assert_eq!(task_itr.next().expect("Expected Task B").id, 2);
         assert_eq!(None, task_itr.next());
     }
 
@@ -423,6 +422,11 @@ mod task_tests {
 
     #[test]
     fn test_get_task_complexity_single_level() {
+        /*
+         *           (t)
+         *          / | \
+         *      (sA)(sB)(sC)
+         */
         let mut task = Task::default();
         let subtask_a = Box::new(Task {
             id: 1,
@@ -441,11 +445,20 @@ mod task_tests {
         task.add_subtask(subtask_b);
         task.add_subtask(subtask_c);
 
-        assert_eq!(task.get_complexity(), 3);
+        assert_eq!(task.get_complexity(), 4);
     }
 
     #[test]
     fn test_get_task_complexity_multilevel() {
+        /*
+         *           (t)
+         *          /   \
+         *       (sA)   (sB)
+         *             /   \
+         *           (sC) (sD)
+         *                 |
+         *                (sE)
+         */
         let mut task = Task::default();
         // Level 1
         let subtask_a = Box::new(Task {
@@ -479,11 +492,14 @@ mod task_tests {
         task.add_subtask(subtask_b);
         task.add_subtask(subtask_a);
 
-        assert_eq!(task.get_complexity(), 3);
+        assert_eq!(task.get_complexity(), 6);
     }
 
     #[test]
     fn test_get_task_complexity_multilevel_single_leaf() {
+        /*
+         * (t) - (sA) - (sB) - (sC) - (sD) - (sE)
+         */
         let mut task = Task::default();
         // Level 1
         let mut subtask_a = Box::new(Task {
@@ -517,7 +533,7 @@ mod task_tests {
         subtask_a.add_subtask(subtask_b);
         task.add_subtask(subtask_a);
 
-        assert_eq!(task.get_complexity(), 1);
+        assert_eq!(task.get_complexity(), 6);
     }
 
     #[test]
@@ -559,9 +575,9 @@ mod task_tests {
         assert_eq!(itr.next().expect("Expected Task #5").id, 5);
         assert_eq!(itr.next().expect("Expected Task #6").id, 6);
         assert_eq!(itr.next().expect("Expected Task #7").id, 7);
-        assert_eq!(itr.next().expect("Expected Task #1").id, 1);
         assert_eq!(itr.next().expect("Expected Task #2").id, 2);
         assert_eq!(itr.next().expect("Expected Task #4").id, 4);
+        assert_eq!(itr.next().expect("Expected Task #1").id, 1);
         assert_eq!(itr.next(), None);
 
     }
@@ -585,8 +601,8 @@ impl Oswald {
         self.root.add_subtask(task)
     }
 
-    pub fn get_all_tasks(&self) -> IntoIter<&Task> {
-        todo!();
+    pub fn get_all_tasks(&self) -> Vec<&Task> {
+        self.root.get_all_subtasks()
     }
 
     async fn load(&mut self) -> anyhow::Result<()> {
@@ -652,15 +668,15 @@ mod oswald_tests {
 
     #[test]
     fn test_get_loaded_tasks() {
-        let mut oswald = Oswald::new(Box::new(MockDataStore::default()));
+        let oswald = Oswald::new(Box::new(MockDataStore::default()));
 
-        let mut itr = oswald.get_all_tasks();
+        let mut itr = oswald.get_all_tasks().into_iter();
 
         assert_eq!(itr.next().expect("Expected  Task #1").id, 1);
+        assert_eq!(itr.next().expect("Expected  Task #0").id, 0);
         assert_eq!(itr.next().expect("Expected  Task #3").id, 3);
         assert_eq!(itr.next().expect("Expected  Task #4").id, 4);
         assert_eq!(itr.next().expect("Expected  Task #5").id, 5);
-        assert_eq!(itr.next().expect("Expected  Task #0").id, 0);
         assert_eq!(itr.next().expect("Expected  Task #2").id, 2);
         assert_eq!(itr.next(), None);
 
