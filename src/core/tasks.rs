@@ -134,6 +134,9 @@ impl Task {
         collected_subtasks.sort();
         return collected_subtasks;
     }
+    pub fn get_all_subtasks(&self) -> Vec<&Self> {
+        todo!();
+    }
 }
 impl PartialEq for Task {
     fn eq(&self, other: &Self) -> bool {
@@ -504,6 +507,51 @@ mod task_tests {
 
         assert_eq!(task.get_complexity(), 1);
     }
+
+    #[test]
+    fn test_collect_all_tasks() {
+        /*      
+         *            (r)
+         *           /   \
+         *       (tA)    (tB)
+         *        |      /  \
+         *      (sB)   (sA)(sC)
+         *      /  \
+         *    (mA)(mB)
+         */
+        let mut root = Box::new(Task::default());
+        
+        let mut task_a = Box::new(Task::new_with_id(1));
+        let mut task_b = Box::new(Task::new_with_id(2));
+
+        let subtasks_a = Box::new(Task::new_with_id(3));
+        let mut subtasks_b = Box::new(Task::new_with_id(4));
+        let subtasks_c = Box::new(Task::new_with_id(5));
+
+        let microtask_a = Box::new(Task::new_with_id(6));
+        let microtask_b = Box::new(Task::new_with_id(7));
+
+        subtasks_b.add_subtask(microtask_a);
+        subtasks_b.add_subtask(microtask_b);
+
+        task_a.add_subtask(subtasks_b);
+
+        task_b.add_subtask(subtasks_a);
+        task_b.add_subtask(subtasks_c);
+
+        root.add_subtask(task_a);
+        root.add_subtask(task_b);
+
+        let mut itr = root.get_all_subtasks().into_iter();
+        assert_eq!(itr.next().expect("Expected Task #6").id, 6);
+        assert_eq!(itr.next().expect("Expected Task #7").id, 7);
+        assert_eq!(itr.next().expect("Expected Task #3").id, 3);
+        assert_eq!(itr.next().expect("Expected Task #5").id, 5);
+        assert_eq!(itr.next().expect("Expected Task #1").id, 1);
+        assert_eq!(itr.next().expect("Expected Task #2").id, 2);
+        assert_eq!(itr.next(), None);
+
+    }
 }
 
 /* OSWALD (TASK SERVICE) =================================================== */
@@ -524,7 +572,7 @@ impl Oswald {
         self.root.add_subtask(task)
     }
 
-    pub fn get_all_tasks<'a>(&self) -> IntoIter<&'a Task> {
+    pub fn get_all_tasks(&self) -> IntoIter<&Task> {
         todo!();
     }
 
