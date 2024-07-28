@@ -49,8 +49,6 @@ pub mod ports {
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::vec::IntoIter;
-use async_trait::async_trait;
 
 /* TASK STATUS ============================================================= */
 #[derive(
@@ -125,7 +123,7 @@ impl Task {
         };
 
         let sub_itr = self.subtasks_map.values();
-        return sub_itr.fold(0_u32, |result, subtask| result + subtask.get_complexity());
+        return 1 + sub_itr.fold(0_u32, |result, subtask| result + subtask.get_complexity());
     }
 
     pub fn add_subtask(&mut self, subtask: Box<Self>) {
@@ -666,20 +664,21 @@ mod oswald_tests {
         assert!(oswald.root.subtasks_map.contains_key(&1));
     }
 
-    #[test]
-    fn test_get_loaded_tasks() {
-        let oswald = Oswald::new(Box::new(MockDataStore::default()));
+    #[sqlx::test]
+    async fn test_get_loaded_tasks() {
+        let mut oswald = Oswald::new(Box::new(MockDataStore::default()));
+
+        assert!(oswald.load().await.is_ok(), "Expected MockDataStore to load");
 
         let mut itr = oswald.get_all_tasks().into_iter();
 
         assert_eq!(itr.next().expect("Expected  Task #1").id, 1);
-        assert_eq!(itr.next().expect("Expected  Task #0").id, 0);
         assert_eq!(itr.next().expect("Expected  Task #3").id, 3);
         assert_eq!(itr.next().expect("Expected  Task #4").id, 4);
         assert_eq!(itr.next().expect("Expected  Task #5").id, 5);
+        assert_eq!(itr.next().expect("Expected  Task #0").id, 0);
         assert_eq!(itr.next().expect("Expected  Task #2").id, 2);
         assert_eq!(itr.next(), None);
-
     }
 }
 
