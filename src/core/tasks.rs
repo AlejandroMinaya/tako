@@ -1,7 +1,3 @@
-use std::cmp::Ordering;
-use std::collections::HashMap;
-
-
 pub mod ports {
     use async_trait::async_trait;
     use std::vec::IntoIter;
@@ -13,8 +9,40 @@ pub mod ports {
         async fn write(&self, task_itr: IntoIter<&Task>) -> bool;
         async fn read(&self) -> anyhow::Result<IntoIter<Box<Task>>>;
     }
+
+    #[derive(Debug, Default)]
+    pub struct MockDataStore {
+        write_return_val: bool,
+    }
+
+    #[async_trait]
+    impl DataStore for MockDataStore {
+        async fn write(&self, _task_itr: IntoIter<&Task>) -> bool {
+            self.write_return_val
+        }
+        async fn read(&self) -> anyhow::Result<IntoIter<Box<Task>>> {
+            let mut task_a = Box::new(Task::new_with_id(0));
+            let task_b = Box::new(Task::new_with_id(1));
+            let mut task_c = Box::new(Task::new_with_id(2));
+            let subtask_a = Box::new(Task::new_with_id(3));
+            let subtask_b = Box::new(Task::new_with_id(4));
+            let subtask_c = Box::new(Task::new_with_id(5));
+            task_a.add_subtask(subtask_a);
+
+            task_c.add_subtask(subtask_b);
+            task_c.add_subtask(subtask_c);
+
+            let test_tasks = vec![task_a, task_b, task_c];
+            Ok(test_tasks.into_iter())
+        }
+    }
 }
 
+
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::vec::IntoIter;
+use async_trait::async_trait;
 
 /* TASK STATUS ============================================================= */
 #[derive(
@@ -496,6 +524,10 @@ impl Oswald {
         self.root.add_subtask(task)
     }
 
+    pub fn get_all_tasks<'a>(&self) -> IntoIter<&'a Task> {
+        todo!();
+    }
+
     async fn load(&mut self) -> anyhow::Result<()> {
         self.data_store
             .read()
@@ -508,12 +540,15 @@ impl Oswald {
 /* TESTS =================================================================== */
 #[cfg(test)]
 mod oswald_tests {
-    use super::*;
-    use crate::ports::test;
+    use super::{
+        Oswald,
+        Task
+    };
+    use super::ports::MockDataStore;
 
     #[sqlx::test]
     async fn test_load_all_tasks_from_data_store() {
-        let mut oswald = Oswald::new(Box::new(test::MockDataStore::default()));
+        let mut oswald = Oswald::new(Box::new(MockDataStore::default()));
 
         let _ = oswald.load().await;
 
@@ -546,12 +581,28 @@ mod oswald_tests {
 
     #[test]
     fn test_add_task() {
-        let mut oswald = Oswald::new(Box::new(test::MockDataStore::default()));
+        let mut oswald = Oswald::new(Box::new(MockDataStore::default()));
         let task = Box::new(Task::new_with_id(1));
 
         oswald.add_task(task);
 
         assert!(oswald.root.subtasks_map.contains_key(&1));
+    }
+
+    #[test]
+    fn test_get_loaded_tasks() {
+        let mut oswald = Oswald::new(Box::new(MockDataStore::default()));
+
+        let mut itr = oswald.get_all_tasks();
+
+        assert_eq!(itr.next().expect("Expected  Task #1").id, 1);
+        assert_eq!(itr.next().expect("Expected  Task #3").id, 3);
+        assert_eq!(itr.next().expect("Expected  Task #4").id, 4);
+        assert_eq!(itr.next().expect("Expected  Task #5").id, 5);
+        assert_eq!(itr.next().expect("Expected  Task #0").id, 0);
+        assert_eq!(itr.next().expect("Expected  Task #2").id, 2);
+        assert_eq!(itr.next(), None);
+
     }
 }
 
