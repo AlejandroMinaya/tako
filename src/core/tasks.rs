@@ -142,7 +142,7 @@ impl Task {
     }
     pub fn get_all_subtasks(&self) -> Vec<&Self> {
         let mut all_subtasks: Vec<&Self> = vec![];
-        if self.subtasks_map.len() == 0 {
+        if self.subtasks_map.is_empty() {
             return all_subtasks;
         }
         self.subtasks_map.values().for_each(|subtask| {
