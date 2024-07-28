@@ -59,6 +59,7 @@ use std::collections::HashMap;
     PartialOrd,
     Ord,
     Clone,
+    Copy
 )]
 #[repr(u8)]
 pub enum TaskStatus {
@@ -81,7 +82,7 @@ impl Into<TaskStatus> for i32 {
 }
 
 /* TASK ==================================================================== */
-#[derive(Debug, Default, Clone)]
+#[derive(Default, Clone)]
 pub struct Task {
     id: u32,
     importance: f32,
@@ -197,6 +198,12 @@ impl Ord for Task {
 impl PartialOrd for Task {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(&other))
+    }
+}
+impl std::fmt::Debug for Task {
+    fn fmt(&self, f:&mut std::fmt::Formatter<'_>) -> std::fmt::Result where TaskStatus: std::fmt::Debug {  
+        write!(f, "Task #{} ({:?}) | (children: {})", self.id, self.status, self.subtasks_map.len())?;
+        write!(f, " | I: {}, U: {}, C: {}", self.importance, self.urgency, self.get_complexity())
     }
 }
 
@@ -603,7 +610,7 @@ impl Oswald {
         self.root.get_all_subtasks()
     }
 
-    async fn load(&mut self) -> anyhow::Result<()> {
+    pub async fn load(&mut self) -> anyhow::Result<()> {
         self.data_store
             .read()
             .await?

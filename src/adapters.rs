@@ -11,12 +11,17 @@ use sqlx::{
         SqlitePoolOptions,
         SqliteRow,
         SqliteTypeInfo,
+        SqliteArgumentValue
     },
+    encode::IsNull,
+    TypeInfo,
     Database,
     Type,
     Decode,
+    Encode,
     FromRow,
     Row,
+    error::BoxDynError,
     Error
 };
 use std::vec::IntoIter;
@@ -50,15 +55,28 @@ where
 {
     fn decode(
         value: <DB as Database>::ValueRef<'r>,
-    ) -> Result<TaskStatus, Box<dyn std::error::Error + 'static + Send + Sync>> {
+    ) -> Result<TaskStatus, BoxDynError> {
         let raw_value = <i32 as Decode<DB>>::decode(value)?;
         Ok(raw_value.into())
+    }
+}
+impl<'q> Encode<'q, Sqlite> for TaskStatus {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<SqliteArgumentValue<'q>>
+    ) -> Result<IsNull, BoxDynError>{
+        args.push(SqliteArgumentValue::Int(*self as i32));
+
+        Ok(IsNull::No)
     }
 }
 
 impl<'r> Type<Sqlite> for TaskStatus {
     fn type_info() -> SqliteTypeInfo {
         <i32 as Type<Sqlite>>::type_info()
+    }
+    fn compatible(ty: &SqliteTypeInfo) -> bool {
+        ty.name() == "INTEGER"
     }
 }
 
@@ -75,8 +93,6 @@ impl DataStore for SQLiteStore {
             .into_iter()
             .map(|raw_task| Box::new(raw_task))
             .collect();
-
-        println!("DB Tasks: {:?}", tasks);
         Ok(tasks.into_iter())
     }
 
