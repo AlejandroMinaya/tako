@@ -107,6 +107,9 @@ impl Task {
             ..Default::default()
         }
     }
+    pub fn get_id(&self) -> u32 {
+        self.id
+    }
     fn get_distance(&self) -> f32 {
         let importance_comp = self.importance.powf(2.0);
         let urgency_comp = self.urgency.powf(2.0);
@@ -210,6 +213,13 @@ impl std::fmt::Debug for Task {
 #[cfg(test)]
 mod task_tests {
     use super::*;
+
+    #[test]
+    fn test_get_id() {
+        let task = Task::default();
+
+        assert_eq!(task.id, task.get_id());
+    }
 
     #[test]
     fn test_add_multiple_task() {

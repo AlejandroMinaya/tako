@@ -9,6 +9,7 @@ use sqlx::{
     sqlite::{
         Sqlite,
         SqlitePoolOptions,
+        SqlitePool,
         SqliteRow,
         SqliteTypeInfo,
         SqliteArgumentValue
@@ -35,6 +36,34 @@ pub struct SQLiteStore {
 impl SQLiteStore {
     pub fn new(conn: String) -> Self {
         SQLiteStore { conn }
+    }
+    async fn read_orphans(&self, pool: &SqlitePool) -> anyhow::Result<IntoIter<Box<Task>>> {
+        let tasks: Vec<Box<Task>> = query_as("SELECT * FROM tasks WHERE parent_id = NULL;")
+            .fetch_all(pool)
+            .await?
+            .into_iter()
+            .map(|raw_task| Box::new(raw_task))
+            .collect();
+        Ok(tasks.into_iter())
+    }
+    async fn read_subtasks(&self, task: &Task, pool: &SqlitePool) -> anyhow::Result<IntoIter<Box<Task>>> {
+        let subtasks: Vec<Box<Task>> = query_as("SELECT * FROM tasks WHERE parent_id = $1)")
+            .bind(task.get_id())
+            .fetch_all(pool)
+            .await?
+            .into_iter()
+            .map(|mut subtask| async {
+                match self.read_subtasks(&subtask, pool).await {
+                    Ok(subtasks) => {
+                        while let Some(sub) = subtasks.next() {
+                            subtask.add_subtask(sub);
+                        }
+                    },
+                    _ => ()
+                };
+                Box::new(subtask)
+            }).collect();
+        Ok(subtasks.into_iter())
     }
 }
 impl<'r> FromRow<'r, SqliteRow> for Task {
@@ -87,13 +116,8 @@ impl DataStore for SQLiteStore {
             .max_connections(1)
             .connect(&self.conn)
             .await?;
-        let tasks: Vec<Box<Task>> = query_as("SELECT * FROM tasks;")
-            .fetch_all(&pool)
-            .await?
-            .into_iter()
-            .map(|raw_task| Box::new(raw_task))
-            .collect();
-        Ok(tasks.into_iter())
+        let orphans = self.read_orphans(&pool).await?;
+
     }
 
     async fn write(&self, task_itr: IntoIter<&Task>) -> bool {
