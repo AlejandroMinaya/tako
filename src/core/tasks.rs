@@ -1,13 +1,16 @@
 pub mod ports {
     use async_trait::async_trait;
     use std::vec::IntoIter;
-    use super::Task;
+    use super::{
+        Task,
+        BoxTaskVec
+    };
     use std::fmt::Debug;
 
     #[async_trait]
     pub trait DataStore: Debug {
         async fn write(&self, task_itr: IntoIter<&Task>) -> bool;
-        async fn read(&self) -> anyhow::Result<IntoIter<Box<Task>>>;
+        async fn read(&self) -> anyhow::Result<BoxTaskVec>;
     }
 
     #[derive(Debug, Default)]
@@ -20,7 +23,7 @@ pub mod ports {
         async fn write(&self, _task_itr: IntoIter<&Task>) -> bool {
             self.write_return_val
         }
-        async fn read(&self) -> anyhow::Result<IntoIter<Box<Task>>> {
+        async fn read(&self) -> anyhow::Result<BoxTaskVec> {
             /*
              *                (r)
              *              /  |  \
@@ -41,7 +44,7 @@ pub mod ports {
             task_c.add_subtask(subtask_c);
 
             let test_tasks = vec![task_a, task_b, task_c];
-            Ok(test_tasks.into_iter())
+            Ok(test_tasks)
         }
     }
 }
@@ -134,6 +137,12 @@ impl Task {
         self.subtasks_map.insert(subtask.id, subtask);
     }
 
+    pub fn add_subtasks_vec(&mut self, subtasks: BoxTaskVec) {
+        // TODO (maybe): name the function with an iterator with fill
+        // TODO: Implement logic to be able to .collect() into the subtasks
+        subtasks.into_iter().for_each(|subtask| self.add_subtask(subtask))
+    }
+
     pub fn get_subtasks(&self) -> Vec<&Self> {
         // TODO (maybe): Cache vector and only sort after insertion/deletion to the map, instead of each time
         let mut collected_subtasks: Vec<&Self> = self
@@ -209,6 +218,8 @@ impl std::fmt::Debug for Task {
         write!(f, " | I: {}, U: {}, C: {}", self.importance, self.urgency, self.get_complexity())
     }
 }
+
+pub type BoxTaskVec = Vec<Box<Task>>;
 
 #[cfg(test)]
 mod task_tests {
@@ -596,6 +607,24 @@ mod task_tests {
         assert_eq!(itr.next(), None);
 
     }
+
+    #[test]
+    fn test_add_multiple_subtasks() {
+        let mut root = Box::new(Task::default());
+
+        let tasks = vec![
+            Box::new(Task::new_with_id(1)),
+            Box::new(Task::new_with_id(2)),
+            Box::new(Task::new_with_id(3))
+        ];
+
+        root.add_subtasks_vec(tasks);
+
+        assert!(root.subtasks_map.contains_key(&1));
+        assert!(root.subtasks_map.contains_key(&2));
+        assert!(root.subtasks_map.contains_key(&3));
+
+    }
 }
 
 /* OSWALD (TASK SERVICE) =================================================== */
@@ -621,10 +650,11 @@ impl Oswald {
     }
 
     pub async fn load(&mut self) -> anyhow::Result<()> {
-        self.data_store
-            .read()
-            .await?
-            .for_each(|boxed_task| self.root.add_subtask(boxed_task));
+        let tasks = self.data_store.read().await?;
+        for task in tasks.into_iter() {
+            self.root.add_subtask(task)
+        }
+
         Ok(())
     }
 }

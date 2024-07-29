@@ -1,6 +1,7 @@
 use crate::core::tasks::{
     Task,
     TaskStatus,
+    BoxTaskVec,
     ports::DataStore
 };
 use async_trait::async_trait;
@@ -37,34 +38,30 @@ impl SQLiteStore {
     pub fn new(conn: String) -> Self {
         SQLiteStore { conn }
     }
-    async fn read_orphans(&self, pool: &SqlitePool) -> anyhow::Result<IntoIter<Box<Task>>> {
-        let tasks: Vec<Box<Task>> = query_as("SELECT * FROM tasks WHERE parent_id = NULL;")
+    async fn fill_subtasks(&self, task: &Task, pool: &SqlitePool) -> anyhow::Result<BoxTaskVec> {
+        let raw_subtasks: Vec<Task> = 
+            query_as("SELECT * FROM tasks WHERE parent_task_id = ?;")
+            .bind(task.get_id())
+            .fetch_all(pool)
+            .await?;
+        let mut results: BoxTaskVec = vec![];
+        for mut raw_subtask in raw_subtasks.into_iter() {
+            let microtasks = Box::pin(self.fill_subtasks(&raw_subtask, pool)).await?;
+            raw_subtask.add_subtasks_vec(microtasks);
+            results.push(Box::new(raw_subtask));
+        }
+        Ok(results)
+    }
+    async fn read_orphans(&self, pool: &SqlitePool) -> anyhow::Result<BoxTaskVec> {
+        let orphans: Vec<Box<Task>> = query_as("SELECT * FROM tasks WHERE parent_task_id ISNULL;")
             .fetch_all(pool)
             .await?
             .into_iter()
             .map(|raw_task| Box::new(raw_task))
             .collect();
-        Ok(tasks.into_iter())
+        Ok(orphans)
     }
-    async fn read_subtasks(&self, task: &Task, pool: &SqlitePool) -> anyhow::Result<IntoIter<Box<Task>>> {
-        let subtasks: Vec<Box<Task>> = query_as("SELECT * FROM tasks WHERE parent_id = $1)")
-            .bind(task.get_id())
-            .fetch_all(pool)
-            .await?
-            .into_iter()
-            .map(|mut subtask| async {
-                match self.read_subtasks(&subtask, pool).await {
-                    Ok(subtasks) => {
-                        while let Some(sub) = subtasks.next() {
-                            subtask.add_subtask(sub);
-                        }
-                    },
-                    _ => ()
-                };
-                Box::new(subtask)
-            }).collect();
-        Ok(subtasks.into_iter())
-    }
+
 }
 impl<'r> FromRow<'r, SqliteRow> for Task {
     fn from_row(row: &'r SqliteRow) -> Result<Self, Error> {
@@ -109,15 +106,24 @@ impl<'r> Type<Sqlite> for TaskStatus {
     }
 }
 
+const MAX_CONNECTIONS: u32 = 5;
 #[async_trait]
 impl DataStore for SQLiteStore {
-    async fn read(&self) -> anyhow::Result<IntoIter<Box<Task>>> {
+    async fn read(&self) -> anyhow::Result<BoxTaskVec> {
         let pool = SqlitePoolOptions::new()
-            .max_connections(1)
+            .max_connections(MAX_CONNECTIONS)
             .connect(&self.conn)
             .await?;
-        let orphans = self.read_orphans(&pool).await?;
 
+        let mut loaded_orphans: BoxTaskVec = vec![];
+
+        let orphans = self.read_orphans(&pool).await?;
+        for mut orphan in orphans.into_iter() {
+            let subtasks = Box::pin(self.fill_subtasks(&orphan, &pool)).await?;
+            orphan.add_subtasks_vec(subtasks);
+            loaded_orphans.push(orphan);
+        }
+        Ok(loaded_orphans)
     }
 
     async fn write(&self, task_itr: IntoIter<&Task>) -> bool {
