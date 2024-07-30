@@ -631,13 +631,11 @@ mod task_tests {
 // https://www.imdb.com/title/tt0293734/
 #[derive(Debug)]
 pub struct Oswald {
-    data_store: Box<dyn ports::DataStore>,
     root: Task,
 }
 impl Oswald {
-    pub fn new(data_store: Box<dyn ports::DataStore>) -> Self {
+    pub fn new() -> Self {
         Oswald {
-            data_store,
             root: Task::default(),
         }
     }
@@ -649,8 +647,8 @@ impl Oswald {
         self.root.get_all_subtasks()
     }
 
-    pub async fn load(&mut self) -> anyhow::Result<()> {
-        let tasks = self.data_store.read().await?;
+    pub async fn load(&mut self, data_store: &dyn ports::DataStore) -> anyhow::Result<()> {
+        let tasks = data_store.read().await?;
         for task in tasks.into_iter() {
             self.root.add_subtask(task)
         }
@@ -670,9 +668,10 @@ mod oswald_tests {
 
     #[sqlx::test]
     async fn test_load_all_tasks_from_data_store() {
-        let mut oswald = Oswald::new(Box::new(MockDataStore::default()));
+        let mut oswald = Oswald::new();
+        let data_store = MockDataStore::default();
 
-        let _ = oswald.load().await;
+        let _ = oswald.load(&data_store).await;
 
         assert!(oswald.root.subtasks_map.contains_key(&0));
         assert!(oswald.root.subtasks_map.contains_key(&1));
@@ -703,7 +702,7 @@ mod oswald_tests {
 
     #[test]
     fn test_add_task() {
-        let mut oswald = Oswald::new(Box::new(MockDataStore::default()));
+        let mut oswald = Oswald::new();
         let task = Box::new(Task::new_with_id(1));
 
         oswald.add_task(task);
@@ -713,9 +712,10 @@ mod oswald_tests {
 
     #[sqlx::test]
     async fn test_get_loaded_tasks() {
-        let mut oswald = Oswald::new(Box::new(MockDataStore::default()));
+        let mut oswald = Oswald::new();
+        let data_store = MockDataStore::default();
 
-        assert!(oswald.load().await.is_ok(), "Expected MockDataStore to load");
+        assert!(oswald.load(&data_store).await.is_ok(), "Expected MockDataStore to load");
 
         let mut itr = oswald.get_all_tasks().into_iter();
 

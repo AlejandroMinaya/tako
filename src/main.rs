@@ -7,10 +7,11 @@ mod ports;
 
 #[tokio::main]
 async fn main() {
-    let mut mngr = Oswald::new(Box::new(SQLiteStore::new("sqlite://playground.sqlite".to_owned())));
-    match mngr.load().await {
+    let data_store = SQLiteStore::new("sqlite://playground.sqlite".to_owned());
+    let mut oswald = Oswald::new();
+    match oswald.load(&data_store).await {
         Ok(()) => {
-            mngr.get_all_tasks().into_iter().for_each(|task| println!("{:?}", task))
+            oswald.get_all_tasks().into_iter().for_each(|task| println!("{:?}", task))
         },
         Err(e) => {
             println!("Couldn't load database {:?}", e);
