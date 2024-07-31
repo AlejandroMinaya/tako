@@ -1,58 +1,8 @@
-pub mod ports {
-    use async_trait::async_trait;
-    use std::vec::IntoIter;
-    use super::{
-        Task,
-        BoxTaskVec
-    };
-    use std::fmt::Debug;
-
-    #[async_trait]
-    pub trait DataStore: Debug {
-        async fn write(&self, task_itr: IntoIter<&Task>) -> bool;
-        async fn read(&self) -> anyhow::Result<BoxTaskVec>;
-    }
-
-    #[derive(Debug, Default)]
-    pub struct MockDataStore {
-        write_return_val: bool,
-    }
-
-    #[async_trait]
-    impl DataStore for MockDataStore {
-        async fn write(&self, _task_itr: IntoIter<&Task>) -> bool {
-            self.write_return_val
-        }
-        async fn read(&self) -> anyhow::Result<BoxTaskVec> {
-            /*
-             *                (r)
-             *              /  |  \
-             *             /   |   \
-             *          (tA) (tB) (tC)
-             *           |       /   \
-             *         (sA)    (sB) (sC)
-             */
-            let mut task_a = Box::new(Task::new_with_id(0));
-            let task_b = Box::new(Task::new_with_id(1));
-            let mut task_c = Box::new(Task::new_with_id(2));
-            let subtask_a = Box::new(Task::new_with_id(3));
-            let subtask_b = Box::new(Task::new_with_id(4));
-            let subtask_c = Box::new(Task::new_with_id(5));
-            task_a.add_subtask(subtask_a);
-
-            task_c.add_subtask(subtask_b);
-            task_c.add_subtask(subtask_c);
-
-            let test_tasks = vec![task_a, task_b, task_c];
-            Ok(test_tasks)
-        }
-    }
-}
-
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
+use crate::ports::DataStore;
 
 /* TASK STATUS ============================================================= */
 #[derive(
@@ -90,10 +40,10 @@ impl Into<TaskStatus> for i32 {
 /* TASK ==================================================================== */
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Task {
-    id: u32,
-    importance: f32,
-    urgency: f32,
-    status: TaskStatus,
+    pub id: u32,
+    pub importance: f32,
+    pub urgency: f32,
+    pub status: TaskStatus,
     subtasks_map: HashMap<u32, Box<Self>>,
 }
 impl Task {
@@ -111,9 +61,6 @@ impl Task {
             id,
             ..Default::default()
         }
-    }
-    pub fn get_id(&self) -> u32 {
-        self.id
     }
     fn get_distance(&self) -> f32 {
         let importance_comp = self.importance.powf(2.0);
@@ -226,13 +173,6 @@ pub type BoxTaskVec = Vec<Box<Task>>;
 #[cfg(test)]
 mod task_tests {
     use super::*;
-
-    #[test]
-    fn test_get_id() {
-        let task = Task::default();
-
-        assert_eq!(task.id, task.get_id());
-    }
 
     #[test]
     fn test_add_multiple_task() {
@@ -649,7 +589,8 @@ impl Oswald {
         self.root.get_all_subtasks()
     }
 
-    pub async fn load(&mut self, data_store: &dyn ports::DataStore) -> anyhow::Result<()> {
+    // TODO: Use status type design pattern in the future
+    pub async fn load(&mut self, data_store: &dyn DataStore) -> anyhow::Result<()> {
         let tasks = data_store.read().await?;
         for task in tasks.into_iter() {
             self.root.add_subtask(task)
@@ -666,7 +607,7 @@ mod oswald_tests {
         Oswald,
         Task
     };
-    use super::ports::MockDataStore;
+    use crate::ports::MockDataStore;
 
     #[sqlx::test]
     async fn test_load_all_tasks_from_data_store() {

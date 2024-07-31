@@ -2,10 +2,12 @@ use crate::core::tasks::{
     Task,
     TaskStatus,
     BoxTaskVec,
-    ports::DataStore
+    
 };
+use crate::ports::DataStore;
 use async_trait::async_trait;
 use sqlx::{
+    query,
     query_as,
     sqlite::{
         Sqlite,
@@ -26,7 +28,6 @@ use sqlx::{
     error::BoxDynError,
     Error
 };
-use std::vec::IntoIter;
 use futures::future::{BoxFuture, FutureExt};
 
 
@@ -43,7 +44,7 @@ impl SQLiteStore {
         let mut results: BoxTaskVec = vec![];
         async move {
             let raw_subtasks_query = query_as("SELECT * FROM tasks WHERE parent_task_id = ?;")
-                .bind(task.get_id())
+                .bind(task.id)
                 .fetch_all(pool);
             match raw_subtasks_query.await {
                 Ok(raw_subtasks) => {
@@ -53,7 +54,7 @@ impl SQLiteStore {
                         results.push(Box::new(raw_subtask));
                     }
                 },
-                Err(_) => { println!("Couldn't retrieve subtasks for task #{}", task.get_id()) }
+                Err(_) => { println!("Couldn't retrieve subtasks for task #{}", task.id) }
             };
             results
         }.boxed()
@@ -113,6 +114,7 @@ impl<'r> Type<Sqlite> for TaskStatus {
 }
 
 const MAX_CONNECTIONS: u32 = 5;
+
 #[async_trait]
 impl DataStore for SQLiteStore {
     async fn read(&self) -> anyhow::Result<BoxTaskVec> {
@@ -132,7 +134,26 @@ impl DataStore for SQLiteStore {
         Ok(loaded_orphans)
     }
 
-    async fn write(&self, task_itr: IntoIter<&Task>) -> bool {
-        todo!();
+    async fn write(&self, tasks: Vec<&Task>) -> anyhow::Result<()> {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(MAX_CONNECTIONS)
+            .connect(&self.conn)
+            .await;
+
+            tasks
+                .into_iter()
+                .fold(
+                    "INSERT INTO tasks VALUES ".to_owned(),
+                    | prev: String, task: &Task | 
+                        format!(
+                        "{prev} ({},{},{},{},NULL),",
+                         task.id,
+                         task.importance,
+                         task.urgency,
+                         task.status as u8
+                        )
+                );
+            
+            Ok(())
     }
 }
