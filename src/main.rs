@@ -19,5 +19,5 @@ async fn main() {
         }
     };
 
-    clients::api::start().await
+    clients::api::start(oswald).await
 }

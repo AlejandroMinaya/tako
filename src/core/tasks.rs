@@ -52,6 +52,7 @@ pub mod ports {
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use serde::{Serialize, Deserialize};
 
 /* TASK STATUS ============================================================= */
 #[derive(
@@ -62,7 +63,9 @@ use std::collections::HashMap;
     PartialOrd,
     Ord,
     Clone,
-    Copy
+    Copy,
+    Serialize,
+    Deserialize
 )]
 #[repr(u8)]
 pub enum TaskStatus {
@@ -85,7 +88,7 @@ impl Into<TaskStatus> for i32 {
 }
 
 /* TASK ==================================================================== */
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Task {
     id: u32,
     importance: f32,
@@ -93,7 +96,6 @@ pub struct Task {
     status: TaskStatus,
     subtasks_map: HashMap<u32, Box<Self>>,
 }
-
 impl Task {
     pub fn new(id: u32, importance: f32, urgency: f32, status: TaskStatus) -> Self {
         Task {
@@ -629,7 +631,7 @@ mod task_tests {
 
 /* OSWALD (TASK SERVICE) =================================================== */
 // https://www.imdb.com/title/tt0293734/
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Oswald {
     root: Task,
 }
