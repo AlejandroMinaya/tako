@@ -68,6 +68,25 @@ impl SQLiteStore {
             .collect();
         Ok(orphans)
     }
+    async fn write_tasks_helper(&self, pool: &SqlitePool, tasks: Vec<&Task>, parent_id: Option<u32>) -> anyhow::Result<()> {
+        let parent_id = match parent_id {
+            Some(id) => id.to_string(),
+            None => "NULL".to_string()
+        };
+        for task in tasks {
+            query("REPLACE INTO tasks VALUES (?,?,?,?,?);")
+                .bind(task.id)
+                .bind(task.importance)
+                .bind(task.urgency)
+                .bind(task.status as u8)
+                .bind(&parent_id)
+                .execute(pool).await?;
+            Box::pin(
+                self.write_tasks_helper(pool, task.get_subtasks(), Some(task.id))
+            ).await?;
+        }
+        Ok(())
+    }
 
 }
 impl<'r> FromRow<'r, SqliteRow> for Task {
@@ -138,22 +157,9 @@ impl DataStore for SQLiteStore {
         let pool = SqlitePoolOptions::new()
             .max_connections(MAX_CONNECTIONS)
             .connect(&self.conn)
-            .await;
+            .await?;
+            let _ = self.write_tasks_helper(&pool,tasks, None).await;
 
-            tasks
-                .into_iter()
-                .fold(
-                    "INSERT INTO tasks VALUES ".to_owned(),
-                    | prev: String, task: &Task | 
-                        format!(
-                        "{prev} ({},{},{},{},NULL),",
-                         task.id,
-                         task.importance,
-                         task.urgency,
-                         task.status as u8
-                        )
-                );
-            
-            Ok(())
+        Ok(())
     }
 }
