@@ -117,6 +117,10 @@ impl Task {
         all_subtasks.sort();
         return all_subtasks
     }
+
+    pub fn get_subtask_parent(&mut self, id: u32) -> &mut Task {
+        todo!();
+    }
 }
 impl PartialEq for Task {
     fn eq(&self, other: &Self) -> bool {
@@ -191,6 +195,41 @@ mod task_tests {
 
         assert!(root.subtasks_map.contains_key(&1));
         assert!(root.subtasks_map.contains_key(&2));
+    }
+
+    #[test]
+    fn test_get_subtask_parent() {
+        /*
+         *           (t)
+         *          /   \
+         *       (sA)   (sB)
+         *             /   \
+         *           (sC) (sD)
+         *                 |
+         *                (sE)
+         */
+        let mut task = Task::default();
+        // Level 1
+        let subtask_a = Box::new(Task::new_with_id(1));
+        let mut subtask_b = Box::new(Task::new_with_id(2));
+        // Level 2
+        let subtask_c = Box::new(Task::new_with_id(3));
+        let mut subtask_d = Box::new(Task::new_with_id(4));
+        // Level 3
+        let subtask_e = Box::new(Task::new_with_id(5));
+
+        subtask_d.add_subtask(subtask_e);
+
+        subtask_b.add_subtask(subtask_d);
+        subtask_b.add_subtask(subtask_c);
+
+        task.add_subtask(subtask_b);
+        task.add_subtask(subtask_a);
+
+        assert_eq!(task.get_subtask_parent(3).expect("Expected Task with id = 2").id, 2);
+        assert_eq!(task.get_subtask_parent(4).expect("Expected Task with id = 2").id, 2);
+        assert_eq!(task.get_subtask_parent(5).expect("Expected Task with id = 4").id, 4);
+        assert_eq!(task.get_subtask_parent(6), None);
     }
 
     #[test]
