@@ -29,3 +29,6 @@ secrets/
 
 # Ignore databases
 *.sqlite
+
+# Ignore env files
+.envrc
