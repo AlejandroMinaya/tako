@@ -28,7 +28,7 @@ use sqlx::{
     error::BoxDynError,
     Error
 };
-use futures::future::{BoxFuture, FutureExt};
+use async_recursion::async_recursion;
 
 
 #[derive(Debug)]
@@ -40,24 +40,23 @@ impl SQLiteStore {
     pub fn new(conn: String) -> Self {
         SQLiteStore { conn }
     }
-    fn fill_subtasks<'a>(&'a self, task: &'a Task, pool: &'a SqlitePool) -> BoxFuture<'a, BoxTaskVec> {
+    #[async_recursion]
+    async fn fill_subtasks<'a>(&'a self, task: &'a Task, pool: &'a SqlitePool) -> BoxTaskVec {
         let mut results: BoxTaskVec = vec![];
-        async move {
-            let raw_subtasks_query = query_as("SELECT * FROM tasks WHERE parent_task_id = ?;")
-                .bind(task.id)
-                .fetch_all(pool);
-            match raw_subtasks_query.await {
-                Ok(raw_subtasks) => {
-                    for mut raw_subtask in raw_subtasks.into_iter() {
-                        let microtasks = Box::pin(self.fill_subtasks(&raw_subtask, pool)).await;
-                        raw_subtask.add_subtasks_vec(microtasks);
-                        results.push(Box::new(raw_subtask));
-                    }
-                },
-                Err(_) => { println!("Couldn't retrieve subtasks for task #{}", task.id) }
-            };
-            results
-        }.boxed()
+        let raw_subtasks_query = query_as("SELECT * FROM tasks WHERE parent_task_id = ?;")
+            .bind(task.id)
+            .fetch_all(pool);
+        match raw_subtasks_query.await {
+            Ok(raw_subtasks) => {
+                for mut raw_subtask in raw_subtasks.into_iter() {
+                    let microtasks = Box::pin(self.fill_subtasks(&raw_subtask, pool)).await;
+                    raw_subtask.add_subtasks_vec(microtasks);
+                    results.push(Box::new(raw_subtask));
+                }
+            },
+            Err(_) => { println!("Couldn't retrieve subtasks for task #{}", task.id) }
+        };
+        results
     }
     async fn read_orphans(&self, pool: &SqlitePool) -> anyhow::Result<BoxTaskVec> {
         let orphans: Vec<Box<Task>> = query_as("SELECT * FROM tasks WHERE parent_task_id ISNULL;")
@@ -68,6 +67,7 @@ impl SQLiteStore {
             .collect();
         Ok(orphans)
     }
+    #[async_recursion]
     async fn write_tasks_helper(&self, pool: &SqlitePool, tasks: Vec<&Task>, parent_id: Option<u32>) -> anyhow::Result<()> {
         let parent_id = match parent_id {
             Some(id) => id.to_string(),
