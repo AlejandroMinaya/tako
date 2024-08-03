@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     importance FLOAT NOT NULL,
     urgency FLOAT NOT NULL,
     status INTEGER NOT NULL,
-    parent_task_id INTEGER,
+    parent_task_id INTEGER NULL,
     FOREIGN KEY (parent_task_id)
         REFERENCES tasks(id)
 );

@@ -8,11 +8,14 @@ pub mod api {
         http::StatusCode,
         Json
     };
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
     use serde_json::{Value, json};
 
 
-    pub async fn start(oswald: Oswald) {
+    pub async fn start(mut oswald: Oswald) {
+        let _ = oswald.load().await;
+
         let oswald = Arc::new(Mutex::new(oswald));
         let app = Router::new()
             .route("/tasks/", get(get_tasks).post(add_task))
@@ -24,24 +27,16 @@ pub mod api {
     }
 
     async fn get_tasks(State(oswald): State<Arc<Mutex<Oswald>>>) -> Json<Value>{
-        match oswald.lock() {
-            Ok(oswald) => Json(json!(oswald.get_tasks())),
-            Err(err) => Json(json!(err.to_string()))
-        }
+        let oswald = oswald.lock().await;
+        Json(json!(oswald.get_tasks()))
     }
 
     #[axum::debug_handler]
     async fn add_task(State(oswald): State<Arc<Mutex<Oswald>>>, Json(task): Json<Box<Task>>) -> Result<StatusCode, StatusCode> {
-        match oswald.lock() {
-            Ok(mut oswald) => {
-                oswald.add_task(task);
-                Ok(StatusCode::CREATED)
-            },
-            Err(err) => {
-                println!("{err}");
-                Err(StatusCode::INTERNAL_SERVER_ERROR)
-            }
-        }
+        let mut oswald = oswald.lock().await;
+        oswald.add_task(task);
+        let _ = oswald.save().await;
+        Ok(StatusCode::CREATED)
     }
 
 }

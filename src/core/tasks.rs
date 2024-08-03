@@ -2,6 +2,7 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
+use std::sync::Arc;
 use crate::ports::DataStore;
 
 /* TASK STATUS ============================================================= */
@@ -647,11 +648,13 @@ mod task_tests {
 #[derive(Debug, Clone)]
 pub struct Oswald {
     root: Task,
+    data_store: Arc<dyn DataStore + Send + Sync>
 }
 impl Oswald {
-    pub fn new() -> Self {
+    pub fn new(data_store: impl DataStore + Send + Sync + 'static) -> Self {
         Oswald {
             root: Task::default(),
+            data_store: Arc::new(data_store)
         }
     }
     pub fn add_task(&mut self, task: Box<Task>) {
@@ -667,8 +670,8 @@ impl Oswald {
     }
 
     // TODO: Use status type design pattern in the future
-    pub async fn load(&mut self, data_store: &dyn DataStore) -> anyhow::Result<()> {
-        let tasks = data_store.read().await?;
+    pub async fn load(&mut self) -> anyhow::Result<()> {
+        let tasks = self.data_store.read().await?;
         for task in tasks.into_iter() {
             self.root.add_subtask(task)
         }
@@ -676,9 +679,9 @@ impl Oswald {
         Ok(())
     }
 
-    pub async fn save(&self, data_store: &dyn DataStore) -> anyhow::Result<()> {
-        let tasks = self.get_all_tasks();
-        data_store.write(tasks).await
+    pub async fn save(&self) -> anyhow::Result<()> {
+        let tasks = self.get_tasks();
+        self.data_store.write(tasks).await
     }
 }
 
@@ -693,10 +696,9 @@ mod oswald_tests {
 
     #[sqlx::test]
     async fn test_load_all_tasks_from_data_store() {
-        let mut oswald = Oswald::new();
-        let data_store = MockDataStore::default();
+        let mut oswald = Oswald::new(MockDataStore::default());
 
-        let _ = oswald.load(&data_store).await;
+        let _ = oswald.load().await;
 
         assert!(oswald.root.subtasks_map.contains_key(&0));
         assert!(oswald.root.subtasks_map.contains_key(&1));
@@ -727,7 +729,7 @@ mod oswald_tests {
 
     #[test]
     fn test_add_task() {
-        let mut oswald = Oswald::new();
+        let mut oswald = Oswald::new(MockDataStore::default());
         let task = Box::new(Task::new_with_id(1));
 
         oswald.add_task(task);
@@ -737,10 +739,9 @@ mod oswald_tests {
 
     #[sqlx::test]
     async fn test_get_loaded_tasks() {
-        let mut oswald = Oswald::new();
-        let data_store = MockDataStore::default();
+        let mut oswald = Oswald::new(MockDataStore::default());
 
-        assert!(oswald.load(&data_store).await.is_ok(), "Expected MockDataStore to load");
+        assert!(oswald.load().await.is_ok(), "Expected MockDataStore to load");
 
         let mut itr = oswald.get_all_tasks().into_iter();
 
@@ -754,10 +755,9 @@ mod oswald_tests {
     }
     #[sqlx::test]
     async fn test_get_top_loaded_tasks() {
-        let mut oswald = Oswald::new();
-        let data_store = MockDataStore::default();
+        let mut oswald = Oswald::new(MockDataStore::default());
 
-        assert!(oswald.load(&data_store).await.is_ok(), "Expected MockDataStore to load");
+        assert!(oswald.load().await.is_ok(), "Expected MockDataStore to load");
 
         let mut itr = oswald.get_tasks().into_iter();
 
@@ -773,10 +773,9 @@ mod oswald_tests {
     // Right now it is only making sure that the .write() is being called
     #[sqlx::test]
     async fn test_save_loaded_tasks() {
-        let oswald = Oswald::new();
-        let data_store = MockDataStore::default();
+        let oswald = Oswald::new(MockDataStore::default());
 
-        assert!(oswald.save(&data_store).await.is_ok(), "Expected MockDataStore to save");
+        assert!(oswald.save().await.is_ok(), "Expected MockDataStore to save");
     }
 }
 

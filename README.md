@@ -41,6 +41,3 @@ This will be different for everybody in the same way that importance and urgency
 - ✅ Start service
 - ✅ Get all tasks
 - ✅ Add/update task
-
-### Pending Decisions
-- How to save/load the data from **any** store into using **any** client/service.

@@ -69,19 +69,16 @@ impl SQLiteStore {
     }
     #[async_recursion]
     async fn write_tasks_helper(&self, pool: &SqlitePool, tasks: Vec<&Task>, parent_id: Option<u32>) -> anyhow::Result<()> {
-        let parent_id = match parent_id {
-            Some(id) => id.to_string(),
-            None => "NULL".to_string()
-        };
         for task in tasks {
-            query("REPLACE INTO tasks VALUES (?,?,?,?,?);")
+            dbg!(task);
+            let _ = query("REPLACE INTO tasks VALUES (?,?,?,?,?);")
                 .bind(task.id)
                 .bind(task.importance)
                 .bind(task.urgency)
                 .bind(task.status as u8)
-                .bind(&parent_id)
-                .execute(pool).await?;
-                let _ = self.write_tasks_helper(pool, task.get_subtasks(), Some(task.id)).await;
+                .bind(parent_id)
+                .execute(pool).await;
+            let _ = self.write_tasks_helper(pool, task.get_subtasks(), Some(task.id)).await;
         }
         Ok(())
     }
@@ -156,7 +153,7 @@ impl DataStore for SQLiteStore {
             .max_connections(MAX_CONNECTIONS)
             .connect(&self.conn)
             .await?;
-            let _ = self.write_tasks_helper(&pool,tasks, None).await;
+            let _ = self.write_tasks_helper(&pool, tasks, None).await;
 
         Ok(())
     }
