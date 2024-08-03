@@ -1,7 +1,7 @@
-# tako
+# tako 🐙
 _Life Management System_
 
-A system to automatically sort tasks for you based on their importance, urgency, and complexity. 
+> **TL;DR:** A system to automatically sort tasks based on their importance, urgency, and complexity. 
 
 ## How does it work?
 The idea is based on Eisenhower's Matrix where you have two axis to represent importance & urgency. By arranging tasks relative to one another on this matrix, you would be able to sort them based on what is the most relevant task you should be doing next.
