@@ -118,8 +118,19 @@ impl Task {
         return all_subtasks
     }
 
-    pub fn get_subtask_parent(&mut self, id: u32) -> &mut Task {
-        todo!();
+    fn get_subtask_parent(&mut self, id: u32) -> Option<&mut Task> {
+        // Searching self
+        if self.subtasks_map.contains_key(&id) {
+           return Some(self)
+        }
+        // Searching subtasks
+        for subtask in self.subtasks_map.values_mut() {
+            if let Some(parent) = subtask.get_subtask_parent(id) {
+                return Some(parent)
+            }
+        }
+        // Not found
+        return None
     }
 }
 impl PartialEq for Task {
