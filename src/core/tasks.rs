@@ -675,6 +675,20 @@ mod oswald_tests {
         assert_eq!(itr.next().expect("Expected  Task #2").id, 2);
         assert_eq!(itr.next(), None);
     }
+    #[sqlx::test]
+    async fn test_get_top_loaded_tasks() {
+        let mut oswald = Oswald::new();
+        let data_store = MockDataStore::default();
+
+        assert!(oswald.load(&data_store).await.is_ok(), "Expected MockDataStore to load");
+
+        let mut itr = oswald.get_tasks().into_iter();
+
+        assert_eq!(itr.next().expect("Expected  Task #1").id, 1);
+        assert_eq!(itr.next().expect("Expected  Task #0").id, 0);
+        assert_eq!(itr.next().expect("Expected  Task #2").id, 2);
+        assert_eq!(itr.next(), None);
+    }
 
     // TODO: This test could be more robust if we find a way to intercept the tasks that are going
     // to be written to the mock data store.
