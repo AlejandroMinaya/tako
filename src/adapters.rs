@@ -81,9 +81,7 @@ impl SQLiteStore {
                 .bind(task.status as u8)
                 .bind(&parent_id)
                 .execute(pool).await?;
-            Box::pin(
-                self.write_tasks_helper(pool, task.get_subtasks(), Some(task.id))
-            ).await?;
+                let _ = self.write_tasks_helper(pool, task.get_subtasks(), Some(task.id)).await;
         }
         Ok(())
     }

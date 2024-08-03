@@ -598,6 +598,11 @@ impl Oswald {
 
         Ok(())
     }
+
+    pub async fn save(&self, data_store: &dyn DataStore) -> anyhow::Result<()> {
+        let tasks = self.get_all_tasks();
+        data_store.write(tasks).await
+    }
 }
 
 /* TESTS =================================================================== */
@@ -669,6 +674,18 @@ mod oswald_tests {
         assert_eq!(itr.next().expect("Expected  Task #0").id, 0);
         assert_eq!(itr.next().expect("Expected  Task #2").id, 2);
         assert_eq!(itr.next(), None);
+    }
+
+    // TODO: This test could be more robust if we find a way to intercept the tasks that are going
+    // to be written to the mock data store.
+    //
+    // Right now it is only making sure that the .write() is being called
+    #[sqlx::test]
+    async fn test_save_loaded_tasks() {
+        let oswald = Oswald::new();
+        let data_store = MockDataStore::default();
+
+        assert!(oswald.save(&data_store).await.is_ok(), "Expected MockDataStore to save");
     }
 }
 

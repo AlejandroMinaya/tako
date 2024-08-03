@@ -7,19 +7,18 @@ use std::fmt::Debug;
 
 #[async_trait]
 pub trait DataStore: Debug {
-    async fn write(&self, _tasks: Vec<&Task>) -> anyhow::Result<()> {
-        Ok(())
-    }
+    async fn write(&self, _tasks: Vec<&Task>) -> anyhow::Result<()>;
     async fn read(&self) -> anyhow::Result<BoxTaskVec>;
 }
 
 #[derive(Debug, Default)]
-pub struct MockDataStore {
-    write_return_val: bool,
-}
+pub struct MockDataStore;
 
 #[async_trait]
 impl DataStore for MockDataStore {
+    async fn write(&self, _tasks: Vec<&Task>) -> anyhow::Result<()> {
+        Ok(())
+    }
     async fn read(&self) -> anyhow::Result<BoxTaskVec> {
         /*
          *                (r)
