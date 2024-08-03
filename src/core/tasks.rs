@@ -585,6 +585,10 @@ impl Oswald {
         self.root.add_subtask(task)
     }
 
+    pub fn get_tasks(&self) -> Vec<&Task> {
+        self.root.get_subtasks()
+    }
+
     pub fn get_all_tasks(&self) -> Vec<&Task> {
         self.root.get_all_subtasks()
     }
