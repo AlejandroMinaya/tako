@@ -79,11 +79,17 @@ impl Task {
         };
 
         let sub_itr = self.subtasks_map.values();
-        return 1 + sub_itr.fold(0_u32, |result, subtask| result + subtask.get_complexity());
+        return sub_itr.fold(1_u32, |result, subtask| result + subtask.get_complexity());
     }
 
-    pub fn add_subtask(&mut self, subtask: Box<Self>) {
+    pub fn _add_subtask(&mut self, subtask: Box<Self>) {
         self.subtasks_map.insert(subtask.id, subtask);
+    }
+    pub fn add_subtask(&mut self, subtask: Box<Self>) {
+        match self.get_subtask_parent(subtask.id) {
+            Some(parent) => { parent._add_subtask(subtask); },
+            None => { self._add_subtask(subtask); }
+        }
     }
 
     pub fn add_subtasks_vec(&mut self, subtasks: BoxTaskVec) {
@@ -430,7 +436,7 @@ mod task_tests {
         root.add_subtask(subtask);
 
         let new_microtask_a = Box::new(Task {
-            id: 3,
+            id: 2,
             importance: 10.0,
             ..Default::default()
         });
@@ -511,28 +517,13 @@ mod task_tests {
          */
         let mut task = Task::default();
         // Level 1
-        let subtask_a = Box::new(Task {
-            id: 1,
-            ..Default::default()
-        });
-        let mut subtask_b = Box::new(Task {
-            id: 2,
-            ..Default::default()
-        });
+        let subtask_a = Box::new(Task::new_with_id(1));
+        let mut subtask_b = Box::new(Task::new_with_id(2));
         // Level 2
-        let subtask_c = Box::new(Task {
-            id: 3,
-            ..Default::default()
-        });
-        let mut subtask_d = Box::new(Task {
-            id: 4,
-            ..Default::default()
-        });
+        let subtask_c = Box::new(Task::new_with_id(3));
+        let mut subtask_d = Box::new(Task::new_with_id(4));
         // Level 3
-        let subtask_e = Box::new(Task {
-            id: 3,
-            ..Default::default()
-        });
+        let subtask_e = Box::new(Task::new_with_id(5));
 
         subtask_d.add_subtask(subtask_e);
 
