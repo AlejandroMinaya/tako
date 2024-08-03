@@ -368,6 +368,38 @@ mod task_tests {
         );
     }
 
+    #[test]
+    fn test_add_same_id_microtask_updates_it() {
+        let mut root = Task::default();
+        let mut subtask = Box::new(Task::new_with_id(1));
+        let microtask_a = Box::new(Task::new_with_id(2));
+        let microtask_b = Box::new(Task::new_with_id(3));
+
+        subtask.add_subtask(microtask_a);
+        subtask.add_subtask(microtask_b);
+        root.add_subtask(subtask);
+
+        let new_microtask_a = Box::new(Task {
+            id: 3,
+            importance: 10.0,
+            ..Default::default()
+        });
+        root.add_subtask(new_microtask_a);
+
+        assert_eq!(root.subtasks_map.len(), 1);
+
+        let mut itr = root.get_subtasks().into_iter();
+        let retrieved_subtask = itr.next().expect("expected task with id = 1");
+
+        assert_eq!(retrieved_subtask.id, 1);
+        assert_eq!(itr.next(), None);
+
+        let mut sub_itr = retrieved_subtask.get_subtasks().into_iter();
+        let retrieved_microtask = sub_itr.next().expect("expected task with id = 2");
+        assert_eq!(retrieved_microtask.id, 2);
+        assert_eq!(retrieved_microtask.importance, 10.0);
+    }
+
     /*
      * TODO: Would be too cumbersome to enforce right now
      * 2024-07-21

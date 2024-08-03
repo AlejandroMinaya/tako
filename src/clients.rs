@@ -25,7 +25,7 @@ pub mod api {
 
     async fn get_tasks(State(oswald): State<Arc<Mutex<Oswald>>>) -> Json<Value>{
         match oswald.lock() {
-            Ok(oswald) => Json(json!(oswald.get_all_tasks())),
+            Ok(oswald) => Json(json!(oswald.get_tasks())),
             Err(err) => Json(json!(err.to_string()))
         }
     }
