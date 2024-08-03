@@ -4,10 +4,10 @@ _Life Management System_
 > **TL;DR:** A system to automatically sort tasks based on their importance, urgency, and complexity. 
 
 ## How does it work?
-The idea is based on Eisenhower's Matrix where you have two axis to represent importance & urgency. By arranging tasks relative to one another on this matrix, you would be able to sort them based on what is the most relevant task you should be doing next.
+The idea is based on Eisenhower's Matrix where you have two axes to represent importance & urgency. By arranging tasks relative to one another on this matrix, you can sort them based on the most relevant task you should be doing next.
 
 ## How do you manage tasks with different complexities?
-This will be different for everybody in the same way that importance and urgency are not the same for everybody. The idea is that you can add subtasks to a task and based on the amount of subtasks, you can get a complexity value. After using it you should get better at breaking down tasks to their most basic components.
+This will be different for everybody in the same way that importance and urgency are not the same. The idea is that you can add subtasks to a task and based on the amount of subtasks, you can get a complexity value. After using it you should get better at breaking down tasks into their most basic components.
 
 ## How do I run it?
 [PENDING]
