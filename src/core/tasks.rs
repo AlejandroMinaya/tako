@@ -45,15 +45,17 @@ pub struct Task {
     pub importance: f32,
     pub urgency: f32,
     pub status: TaskStatus,
+    pub desc: String,
     subtasks_map: HashMap<u32, Box<Self>>,
 }
 impl Task {
-    pub fn new(id: u32, importance: f32, urgency: f32, status: TaskStatus) -> Self {
+    pub fn new(id: u32, desc: String, importance: f32, urgency: f32, status: TaskStatus) -> Self {
         Task {
             id,
             importance,
             urgency,
             status,
+            desc,
             subtasks_map: HashMap::new()
         }
     }

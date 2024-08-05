@@ -88,6 +88,7 @@ impl<'r> FromRow<'r, SqliteRow> for Task {
     fn from_row(row: &'r SqliteRow) -> Result<Self, Error> {
         let task = Task::new(
             row.try_get("id")?,
+            row.try_get("desc")?,
             row.try_get("importance")?,
             row.try_get("urgency")?,
             row.try_get("status")?,
