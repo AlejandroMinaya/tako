@@ -80,7 +80,12 @@ struct Tako {
 impl Tako {
     fn save_form_task(&mut self) {
         let task = self.form_task.clone();
-        self.oswald.add_task(Box::new(task));
+        if let Some(mut selected) = self.selected_task.take() {
+            selected.add_subtask(Box::new(task));
+            self.oswald.add_task(Box::new(selected));
+        } else {
+            self.oswald.add_task(Box::new(task));
+        }
     }
 }
 impl eframe::App for Tako {
@@ -102,10 +107,25 @@ impl eframe::App for Tako {
             .resizable(false)
             .min_height(BOTTOM_PANEL_HEIGHT)
             .show(ctx, |ui| {
-                ui.vertical(|ui| {
+                ui.horizontal_top(|ui| {
                     if ui.button("New Task").clicked() {
                         self.task_form_open = !self.task_form_open;
-                        self.form_task.id = self.next_id;
+                        self.form_task = Task::new_with_id(self.next_id);
+                        self.selected_task = None;
+                    }
+                    
+                    if self.selected_task.is_some() {
+                        if ui.button("Add Subtask").clicked() {
+                            self.task_form_open = !self.task_form_open;
+                            self.form_task = Task::new_with_id(self.next_id);
+                        }
+                        if ui.button("Edit Task").clicked() {
+                            if let Some(selected) = self.selected_task.take() {
+                                self.task_form_open = !self.task_form_open;
+                                self.form_task = selected;
+
+                            }
+                        }
                     }
                 });
             });
