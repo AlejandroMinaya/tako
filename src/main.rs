@@ -11,5 +11,5 @@ mod ports;
 async fn main() {
     let conn_str = env::var("DATABASE_URL_SQLITE").expect("Expected to find DATABASE_URL_SQLITE envar");
     let oswald = Oswald::new(SQLiteStore::new(conn_str));
-    clients::api::start(oswald).await
+    clients::wasm_app::start(oswald).await.unwrap();
 }
