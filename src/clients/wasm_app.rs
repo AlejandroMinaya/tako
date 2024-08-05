@@ -6,9 +6,11 @@ use egui::{
     TopBottomPanel,
     Color32,
     Vec2,
-    Button,
     Window,
+    Align,
+    Align2,
     Key,
+    CursorIcon,
     text::LayoutJob,
     FontId,
     FontFamily
@@ -21,30 +23,46 @@ use eframe::{
 use crate::core::tasks::{Oswald, Task};
 
 const TASK_BG: Color32 = Color32::from_rgb(109, 33, 79);
+const SELECTED_TASK_BG: Color32 = Color32::from_rgb(106, 176, 76);
 const TASK_FG: Color32 = Color32::from_rgb(255, 204, 204);
+const SELECTED_TASK_FG: Color32 = Color32::from_rgb(248, 239, 186);
 const TASK_RADIUS: f32 = 8.0;
 const TASK_SIZE: Vec2 = Vec2 { x: 160.0, y: 98.89 };
-const TASK_FONT_SIZE: f32 = 16.0;
-const TASK_INNER_MARGIN: f32 = 32.0;
+const TASK_FONT_SIZE: f32 = 12.0;
+const TASK_INNER_MARGIN: f32 = 16.0;
 const BOTTOM_PANEL_HEIGHT: f32 = 8.0;
 
 impl Task {
-    fn ui(&self, ui: &mut Ui) {
-        let task_desc = LayoutJob::simple(
+    fn ui(&self, app: &Tako, ui: &mut Ui) -> (egui::Id, egui::Rect) {
+        let mut bg = TASK_BG;
+        let mut fg = TASK_FG;
+
+        if let Some(selected) = app.selected_task.as_ref() {
+            if (selected.id == self.id) {
+                bg = SELECTED_TASK_BG; 
+                fg = SELECTED_TASK_FG;
+            }
+        }
+
+        let (id, rect) = ui.allocate_space(TASK_SIZE);
+        ui.painter().rect_filled(rect, TASK_RADIUS, bg);
+
+        let content_rect = rect.shrink(TASK_INNER_MARGIN);
+
+        let mut text = LayoutJob::simple(
             self.desc.clone(),
-            FontId {
-                size: TASK_FONT_SIZE, family: FontFamily::Proportional
-            },
-            TASK_FG,
-            TASK_SIZE.x - TASK_INNER_MARGIN
+            FontId { size: TASK_FONT_SIZE, family: FontFamily::Monospace },
+            fg,
+            content_rect.width()
         );
-        let button = Button::new(task_desc)
-            .fill(TASK_BG)
-            .frame(false)
-            .rounding(TASK_RADIUS)
-            .min_size(TASK_SIZE)
-            .sense(egui::Sense::drag());
-        ui.add(button);
+        text.halign = Align::Center;
+        let mut text_pos = Align2::CENTER_CENTER.pos_in_rect(&content_rect);
+        text_pos.y -= TASK_FONT_SIZE/2.0;
+        let galley = ui.painter().layout_job(text);
+        ui.painter().galley(text_pos, galley, TASK_FG);
+
+        return (id, rect)
+
     }
     fn form_ui(&mut self, ui: &mut Ui) {
         ui.label("Task:");
@@ -56,6 +74,7 @@ struct Tako {
     oswald: Oswald,
     task_form_open: bool,
     form_task: Task,
+    pub selected_task: Option<Task>,
     next_id: u32
 }
 impl Tako {
@@ -71,7 +90,10 @@ impl eframe::App for Tako {
             ui.vertical(|ui| {
                 for task in self.oswald.get_all_tasks() {
                     self.next_id = std::cmp::max(self.next_id, task.id + 1);
-                    task.ui(ui);
+                    let (id, rect) = task.ui(&self, ui);
+                    if ui.interact(rect, id, egui::Sense::click()).clicked {
+                        self.selected_task = Some(task.clone());
+                    }
                 }
             });
         });
@@ -139,6 +161,7 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
         Ok(Box::new(Tako { 
             oswald,
             form_task: Task::default(),
+            selected_task: None,
             task_form_open: false,
             next_id: 1
         }))
