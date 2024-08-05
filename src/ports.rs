@@ -43,3 +43,16 @@ impl DataStore for MockDataStore {
         Ok(test_tasks)
     }
 }
+
+#[derive(Debug, Default)]
+pub struct DummyStore;
+
+#[async_trait]
+impl DataStore for DummyStore {
+    async fn write(&self, _tasks: Vec<&Task>) -> anyhow::Result<()> {
+        Ok(())
+    }
+    async fn read(&self) -> anyhow::Result<BoxTaskVec> {
+        Ok(vec![])
+    }
+}

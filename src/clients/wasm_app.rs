@@ -10,6 +10,7 @@ use egui::{
 };
 use eframe::{
     NativeOptions,
+    Storage,
     run_native
 };
 use crate::core::tasks::{Oswald, Task};
@@ -47,18 +48,27 @@ impl eframe::App for Tako {
             });
         });
     }
+    fn save(&mut self, storage: &mut dyn Storage) {
+        let tasks = self.oswald.get_tasks();
+        match serde_json::to_string(&tasks) {
+            Ok(tasks_str) => { storage.set_string("tasks", tasks_str) },
+            Err(err) => { println!("Couldn't save tasks: {err}") }
+        }
+    }
 }
 pub async fn start(mut oswald: Oswald) -> eframe::Result {
     let options = NativeOptions {
         viewport: ViewportBuilder::default()
         ,..Default::default()
     };
-    if let Err(err) = oswald.load().await {
-        println!("Couldn't load data {err}");
-    }
-    run_native("Tako", options, Box::new(|_cc| {
-        Ok(Box::new(Tako {
-            oswald
-        }))
+    run_native("Tako", options, Box::new(|cc| {
+        if let Some(storage) = cc.storage { 
+            let tasks_str = storage.get_string("tasks").unwrap_or("[]".to_owned());
+            let raw_tasks: Vec<Task> = serde_json::from_str(&tasks_str)?;
+            for task in raw_tasks {
+                oswald.add_task(Box::new(task));
+            }
+        }
+        Ok(Box::new(Tako { oswald }))
     }))
 }
