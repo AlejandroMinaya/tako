@@ -672,7 +672,7 @@ impl Oswald {
     }
 
     pub fn clear(&mut self) {
-        todo!();
+        self.root = Task::default();
     }
 
     // TODO: Use status type design pattern in the future
