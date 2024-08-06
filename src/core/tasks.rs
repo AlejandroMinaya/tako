@@ -76,7 +76,7 @@ impl Task {
         };
     }
 
-    fn get_complexity(&self) -> u32 {
+    pub fn get_complexity(&self) -> u32 {
         if self.subtasks_map.is_empty() {
             return 1;
         };

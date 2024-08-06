@@ -6,9 +6,8 @@ use egui::{
     Vec2,
     Ui,
     Frame,
-    TopBottomPanel,
+    SidePanel,
     CentralPanel,
-    Layout,
     Align,
     Align2,
     Response,
@@ -26,39 +25,60 @@ use eframe::{
 use crate::core::tasks::{Oswald, Task};
 
 const INNER_MARGIN: f32 = 0.0;
-const TASK_BG: Color32 = Color32::from_rgb(109, 33, 79);
+const MENU_WIDTH: f32 = 144.0;
+
+const BUTTON_SELECTED_BG: Color32 = Color32::from_rgb(119, 140, 163);
+const BUTTON_HOVERED_BG: Color32 = Color32::from_rgb(165, 177, 194);
+const BUTTON_BG: Color32 = Color32::from_rgb(47, 53, 66);
+const BUTTON_FG: Color32 = Color32::from_rgb(241, 242, 246);
+const BUTTON_FONT_SIZE: f32 = 12.0;
+const BUTTON_MARGIN: f32 = 2.0;
+const BUTTON_PADDING: f32 = 8.0;
+const BUTTON_RADIUS: f32 = 16.0;
+
 const SELECTED_TASK_BG: Color32 = Color32::from_rgb(106, 176, 76);
-const TASK_FG: Color32 = Color32::from_rgb(255, 204, 204);
 const SELECTED_TASK_FG: Color32 = Color32::from_rgb(248, 239, 186);
+
+const TASK_BG: Color32 = Color32::from_rgb(109, 33, 79);
+const TASK_HOVERED_BG: Color32 = Color32::from_rgb(179, 55, 113);
+const TASK_FG: Color32 = Color32::from_rgb(255, 204, 204);
+const TASK_FONT_SIZE: f32 = 12.0;
+const TASK_MARGIN: f32 = 2.0;
+const TASK_PADDING: f32 = 16.0;
 const TASK_RADIUS: f32 = 8.0;
 const TASK_SIZE: Vec2 = Vec2 { x: 120.0, y: 80.0 };
-const TASK_FONT_SIZE: f32 = 12.0;
-const TASK_PADDING: f32 = 16.0;
-const TASK_MARGIN: f32 = 2.0;
-const BOTTOM_PANEL_HEIGHT: f32 = 8.0;
 
 impl Task { 
     fn show_overview(&mut self, ui: &mut Ui) -> Response {
         let (task_rect, response) = ui.allocate_at_least(TASK_SIZE, Sense::click());
-
+        let mut background_color = 
+            if response.hovered() {
+                TASK_HOVERED_BG
+            } else {
+                TASK_BG
+            };
+        let complexity: f32 = self.get_complexity() as f32;
+        if complexity > 1.0 {
+            background_color = background_color.gamma_multiply(1.0/complexity);
+        }
         let content_rect = task_rect.shrink(TASK_PADDING);
+        let mut text_layout = LayoutJob::simple(
+            self.desc.clone(),
+            FontId { size: TASK_FONT_SIZE, family: FontFamily::Monospace },
+            TASK_FG,
+            content_rect.width()
+        );
+        text_layout.halign = Align::Center;
+        let mut text_pos = Align2::CENTER_CENTER.pos_in_rect(&content_rect);
+        text_pos.y -= TASK_FONT_SIZE/2.0;
 
         Frame::default()
             .outer_margin(TASK_MARGIN)
             .show(ui, |ui| {
-            ui.painter().rect_filled(task_rect, TASK_RADIUS, TASK_BG);
-            let mut text_layout = LayoutJob::simple(
-                self.desc.clone(),
-                FontId { size: TASK_FONT_SIZE, family: FontFamily::Monospace },
-                TASK_FG,
-                content_rect.width()
-            );
-            text_layout.halign = Align::Center;
-            let mut text_pos = Align2::CENTER_CENTER.pos_in_rect(&content_rect);
-            text_pos.y -= TASK_FONT_SIZE/2.0;
-            let text_galley = ui.painter().layout_job(text_layout);
-            ui.painter().galley(text_pos, text_galley, TASK_FG);
-        });
+                let text_galley = ui.painter().layout_job(text_layout);
+                ui.painter().rect_filled(task_rect, TASK_RADIUS, background_color); 
+                ui.painter().galley(text_pos, text_galley, TASK_FG);
+            });
 
         response
     }
@@ -78,20 +98,60 @@ struct Tako {
     next_task_id: u32
 }
 impl Tako {
-    fn show_top_bar(&mut self, ctx: &Context) {
-        TopBottomPanel::top("Menu").show(ctx, |ui| {
-            ui.with_layout(Layout::top_down(Align::Center), |ui| {
-                ui.horizontal(|ui| {
-                    if ui.button("Arrange").clicked() {
-                        self.current_view = View::Arrange;
-                    }
-                    if ui.button("Overview").clicked() {
-                        self.current_view = View::Overview;
-                    }
-                });
+    fn tako_full_button(&self, ui: &mut Ui, text: &str, selected: bool) -> Response {
+        let width = ui.available_width();
+        let height = BUTTON_FONT_SIZE + BUTTON_PADDING;
+        let (rect, response) = ui.allocate_exact_size(
+            [width, height].into(), Sense::click()
+        );
+        let background_color = 
+            if selected {
+                BUTTON_SELECTED_BG
+            } else if response.hovered() {
+                BUTTON_HOVERED_BG
+            } else {
+                BUTTON_BG
+            };
+        let content_rect = rect.shrink(BUTTON_PADDING);
+        let mut text_layout = LayoutJob::simple(
+            text.to_string(),
+            FontId { size: BUTTON_FONT_SIZE, family: FontFamily::Monospace },
+            BUTTON_FG,
+            content_rect.width()
+        );
+        text_layout.halign = Align::Center;
+        let mut text_pos = Align2::CENTER_CENTER.pos_in_rect(&content_rect);
+        text_pos.y -= BUTTON_FONT_SIZE/2.0;
+
+        Frame::default()
+            .outer_margin(BUTTON_MARGIN)
+            .show(ui, |ui| {
+                let text_galley = ui.painter().layout_job(text_layout);
+                ui.painter().rect_filled(rect, BUTTON_RADIUS, background_color);
+                ui.painter().galley(text_pos, text_galley, BUTTON_FG);
+        });
+
+        response
+    }
+
+    fn show_menu(&mut self, ctx: &Context) {
+        SidePanel::left("Options")
+            .exact_width(MENU_WIDTH)
+            .resizable(false)
+            .show(ctx, |ui| {
+            ui.vertical_centered(|ui| {
+                ui.heading("tako");
+                ui.spacing();
+                if self.tako_full_button(ui, "Overview", matches!(self.current_view, View::Overview)).clicked() {
+                    self.current_view = View::Overview;
+                }
+                if self.tako_full_button(ui, "Arrange", matches!(self.current_view, View::Arrange)).clicked() {
+                    self.current_view = View::Arrange;
+                }
             });
         });
     }
+
     fn show_overview_frame(&mut self, ui: &mut Ui) {
         Frame::default()
             .inner_margin(INNER_MARGIN)
@@ -128,7 +188,7 @@ impl eframe::App for Tako {
         }
     }
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) { 
-        self.show_top_bar(ctx);
+        self.show_menu(ctx);
 
         CentralPanel::default().show(ctx, |ui| {
             match self.current_view {
@@ -153,7 +213,7 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
         Ok(Box::new(Tako {
             oswald, 
             current_view: View::Overview,
-            target_daily_tasks: 2,
+            target_daily_tasks: 5,
             overview_columns: 3,
             next_task_id: 1
         }))
