@@ -3,10 +3,8 @@ use egui::{
     Window,
     Button,
     Context,
-    Direction,
     ViewportBuilder,
     Color32,
-    Layout,
     Vec2,
     Pos2,
     Ui,
@@ -67,21 +65,9 @@ fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
     }
     return (curr - min_val) / (max_val - min_val);
 }
-fn denorm_value(norm_value: f32, mut min_val: f32, mut max_val: f32) -> f32 {
-    if max_val == min_val {
-        return 0.0;
-    }
-    if min_val < 0.0 {
-        max_val += min_val.abs();
-        min_val = 0.0;
-    }
-    return norm_value * (max_val - min_val) + min_val
-
-}
-
 
 impl Task { 
-    fn delta_update(&mut self, delta: &Vec2, area: &Rect, stats: &Stats) {
+    fn delta_update(&mut self, delta: &Vec2, area: &Rect) {
         let urgency_delta = delta.x / area.width() * DRAG_SPEED;
         let importance_delta = -delta.y / area.height() * DRAG_SPEED;
         dbg!(delta, urgency_delta, importance_delta);
@@ -238,7 +224,6 @@ struct Tako {
     target_daily_tasks: usize,
     overview_columns: usize,
     form_task: Option<Task>,
-    form_task_desc: String,
     arrange_parent_task: Option<Task>,
     arrange_prev_parents: Vec<Task>,
     next_task_id: u32
@@ -367,7 +352,7 @@ impl Tako {
                                     let delta = response.drag_motion();
                                     if delta != Vec2::ZERO {
                                         let mut task = task.clone();
-                                        task.delta_update(&delta, &area_rect, &task_stats);
+                                        task.delta_update(&delta, &area_rect);
                                         updated_tasks.push(Box::new(task));
                                     }
                                 }
@@ -469,7 +454,6 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
         Ok(Box::new(Tako {
             oswald, 
             form_task: None,
-            form_task_desc: "".to_string(),
             arrange_parent_task: None,
             arrange_prev_parents: vec![],
             current_view: View::Overview,
