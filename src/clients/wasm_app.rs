@@ -53,21 +53,29 @@ const TASK_PADDING: f32 = 16.0;
 const TASK_RADIUS: f32 = 8.0;
 const TASK_SIZE: Vec2 = Vec2 { x: 120.0, y: 80.0 };
 
-fn norm_value(curr: f32, min_val: f32, max_val: f32) -> f32 {
+const DRAG_SCALE_FACTOR: f32 = 0.9;
+
+fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
     if max_val == min_val {
         return 0.0;
+    }
+    if min_val < 0.0 {
+        curr += min_val.abs();
+        max_val += min_val.abs();
+        min_val += min_val.abs()
     }
     return (curr - min_val) / (max_val - min_val);
 }
 
 impl Task { 
-    fn delta_update(&mut self, delta: Vec2, stats: &Stats, area: &Rect) {
-        self.urgency += (delta.x/area.width()) * (stats.max_urgency - stats.min_urgency) + stats.min_urgency;
-        self.importance += (delta.y/area.height()) * (stats.max_importance - stats.min_importance) + stats.min_importance;
+    fn delta_update(&mut self, delta: Vec2) {
+        self.urgency += delta.x/DRAG_SCALE_FACTOR;
+        self.importance += delta.y/DRAG_SCALE_FACTOR;
     }
     fn get_arrange_rect(&self, ui: &Ui, stats: &Stats, area: &Rect) -> Rect {
         let norm_importance =  norm_value(self.importance, stats.min_importance, stats.max_importance);
         let norm_urgency =  norm_value(self.urgency, stats.min_urgency, stats.max_urgency);
+
         let half_task_width = TASK_SIZE.x/2.0;
         let half_task_height = TASK_SIZE.y/2.0;
 
@@ -75,8 +83,8 @@ impl Task {
         let area_height = area.height();
 
         let center = Pos2 {
-            x: area.min.x + area_width/2.0 + norm_urgency * area_width,
-            y: area.min.y + area_height/2.0 + norm_importance * area_height
+            x: area.min.x + norm_urgency * area_width,
+            y: area.min.y + norm_importance * area_height
         };
         let top_left = Pos2 {
             x: center.x - half_task_width,
@@ -166,6 +174,8 @@ enum View {
     #[default]
     Overview
 }
+
+#[derive(Debug)]
 struct Stats {
     next_task_id: u32,
     max_urgency: f32,
@@ -277,17 +287,10 @@ impl Tako {
                             }
 
                             if response.dragged() {
-                                let delta = response.drag_delta();
+                                let delta = response.drag_motion();
                                 if delta != Vec2::ZERO {
                                     let mut task = task.clone();
-                                    dbg!(
-                                        &response.id,
-                                        &task.importance,
-                                        &task.urgency,
-                                        response.drag_motion(),
-                                        response.drag_delta()
-                                    );
-                                    task.delta_update(response.drag_delta(), &self.stats, &rect);
+                                    task.delta_update(delta);
                                     updated_tasks.push(Box::new(task));
                                 }
                             }
