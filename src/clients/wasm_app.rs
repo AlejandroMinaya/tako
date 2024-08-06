@@ -1,8 +1,12 @@
 use std::cmp::max;
 use egui::{
+    Window,
+    Button,
     Context,
+    Direction,
     ViewportBuilder,
     Color32,
+    Layout,
     Vec2,
     Pos2,
     Ui,
@@ -41,9 +45,6 @@ const BUTTON_MARGIN: f32 = 2.0;
 const BUTTON_PADDING: f32 = 8.0;
 const BUTTON_RADIUS: f32 = 16.0;
 
-const SELECTED_TASK_BG: Color32 = Color32::from_rgb(106, 176, 76);
-const SELECTED_TASK_FG: Color32 = Color32::from_rgb(248, 239, 186);
-
 const TASK_BG: Color32 = Color32::from_rgb(109, 33, 79);
 const TASK_HOVERED_BG: Color32 = Color32::from_rgb(179, 55, 113);
 const TASK_FG: Color32 = Color32::from_rgb(255, 204, 204);
@@ -53,7 +54,7 @@ const TASK_PADDING: f32 = 16.0;
 const TASK_RADIUS: f32 = 8.0;
 const TASK_SIZE: Vec2 = Vec2 { x: 120.0, y: 80.0 };
 
-const DRAG_SCALE_FACTOR: f32 = 0.9;
+const DRAG_SPEED: f32 = 15.0;
 
 fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
     if max_val == min_val {
@@ -62,18 +63,32 @@ fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
     if min_val < 0.0 {
         curr += min_val.abs();
         max_val += min_val.abs();
-        min_val += min_val.abs()
+        min_val = 0.0;
     }
     return (curr - min_val) / (max_val - min_val);
+}
+fn denorm_value(norm_value: f32, mut min_val: f32, mut max_val: f32) -> f32 {
+    if max_val == min_val {
+        return 0.0;
+    }
+    if min_val < 0.0 {
+        max_val += min_val.abs();
+        min_val = 0.0;
+    }
+    return norm_value * (max_val - min_val) + min_val
+
 }
 
 
 impl Task { 
     fn delta_update(&mut self, delta: &Vec2, area: &Rect, stats: &Stats) {
-        self.urgency += (delta.x / area.width()) * (stats.max_urgency - stats.min_urgency) + f32::max(stats.min_urgency, 0.0);
-        self.importance += (delta.y / area.height()) * (stats.max_importance - stats.min_importance) + f32::max(stats.min_importance, 0.0);
+        let urgency_delta = delta.x / area.width() * DRAG_SPEED;
+        let importance_delta = -delta.y / area.height() * DRAG_SPEED;
+        dbg!(delta, urgency_delta, importance_delta);
+        self.urgency += urgency_delta;
+        self.importance += importance_delta;
     }
-    fn get_arrange_rect(&self, ui: &Ui, stats: &Stats, area: &Rect) -> Rect {
+    fn get_arrange_rect(&self, stats: &Stats, area: &Rect) -> Rect {
         let norm_importance =  norm_value(self.importance, stats.min_importance, stats.max_importance);
         let norm_urgency =  norm_value(self.urgency, stats.min_urgency, stats.max_urgency);
 
@@ -95,7 +110,7 @@ impl Task {
 
         let center = Pos2 {
             x: area.min.x + norm_urgency * area_width,
-            y: area.min.y + norm_importance * area_height
+            y: area.min.y + (1.0 - norm_importance) * area_height
         };
         let top_left = Pos2 {
             x: center.x - half_task_width,
@@ -108,16 +123,21 @@ impl Task {
         Rect { min: top_left, max: bottom_right }
     }
     fn show_arrange(&self, ui: &mut Ui, stats: &Stats, area: &Rect) -> Response {
-        let task_rect = self.get_arrange_rect(ui, stats, area);
+        let task_rect = self.get_arrange_rect(stats, area);
         let _ = ui.allocate_rect(task_rect, Sense::click_and_drag());
         let id = Id::new(format!("task_{}", self.id));
         let response = ui.interact(task_rect, id, Sense::click_and_drag());
-        let background_color = 
+        let mut background_color = 
             if response.hovered() {
                 TASK_HOVERED_BG
             } else {
                 TASK_BG
             };
+        let complexity: f32 = self.get_complexity() as f32;
+        if complexity > 1.0 {
+            background_color = background_color.gamma_multiply(1.0/complexity
+            );
+        }
         let content_rect = task_rect.shrink(TASK_PADDING);
         let mut text_layout = LayoutJob::simple(
             self.desc.clone(),
@@ -217,6 +237,8 @@ struct Tako {
     current_view: View,
     target_daily_tasks: usize,
     overview_columns: usize,
+    form_task: Option<Task>,
+    form_task_desc: String,
     arrange_parent_task: Option<Task>,
     arrange_prev_parents: Vec<Task>,
     next_task_id: u32
@@ -296,20 +318,27 @@ impl Tako {
             });
     }
     fn show_arrange_frame(&mut self, ui: &mut Ui, ctx: &Context) {
+        self.show_task_form(ctx);
         Frame::default()
             .show(ui, |ui| {
                 ui.vertical(|ui| {
                     ui.horizontal(|ui| {
-                        if self.arrange_parent_task.is_some() {
-                            if ui.button("Home").clicked() {
-                                self.arrange_prev_parents.clear();
-                                self.arrange_parent_task = None;
-                            };
-                            if ui.button("Back").clicked() {
-                                self.arrange_parent_task = self.arrange_prev_parents.pop()
-                            }
+                        if ui.add_sized(Vec2::new(144.0, 16.0), Button::new("Add Task")).clicked() {
+                            self.form_task = Some(Task::new_with_id(self.next_task_id));
                         }
+                        ui.horizontal(|ui| {
+                            if self.arrange_parent_task.is_some() {
+                                if ui.button("Home").clicked() {
+                                    self.arrange_prev_parents.clear();
+                                    self.arrange_parent_task = None;
+                                };
+                                if ui.button("Back").clicked() {
+                                    self.arrange_parent_task = self.arrange_prev_parents.pop()
+                                }
+                            }
+                        });
                     });
+                    ui.separator();
                     let (_, area_rect) = ui.allocate_space(ui.available_size());
                     Area::new("Arrange".into())
                         .movable(true)
@@ -323,11 +352,16 @@ impl Tako {
                             let mut updated_tasks: BoxTaskVec = vec![];
                             let mut new_parent_task: Option<Task> = None;
                             let task_stats = Stats::from_tasks(&tasks);
+
                             for task in tasks {
                                 let response = task.show_arrange(ui, &task_stats, &area_rect);
-                                if response.double_clicked() {
+
+                                if response.triple_clicked() {
+                                    self.form_task = Some(task.clone());
+                                } else if response.double_clicked() {
                                     new_parent_task = Some(task.clone());
                                 }
+
 
                                 if response.dragged() {
                                     let delta = response.drag_motion();
@@ -338,16 +372,62 @@ impl Tako {
                                     }
                                 }
                             }
+
                             if let Some(new_parent) = new_parent_task.take() {
                                 if let Some(old_parent) = self.arrange_parent_task.take() {
                                     self.arrange_prev_parents.push(old_parent);
                                 }
                                 self.arrange_parent_task = Some(new_parent);
                             }
-                            updated_tasks.into_iter().for_each(|task| self.oswald.add_task(task));
+
+                            updated_tasks.into_iter().for_each(|task| {
+                                self.oswald.add_task(task);
+                            });
                         });
                 });
             });
+    }
+    fn show_task_form(&mut self, ctx: &Context) {
+        let mut pending_cancel = false;
+        let mut pending_save = false;
+        if let Some(task) = &mut self.form_task {
+            Window::new("Task Form")
+                .title_bar(false)
+                .show(ctx, |ui| { 
+                ui.vertical(|ui| {
+                    ui.text_edit_singleline(&mut task.desc);
+                    ui.horizontal(|ui| {
+                        if ui.button("Cancel").clicked() {
+                            pending_cancel = true;
+                        } 
+                        if ui.button("Save").clicked() {
+                            pending_save = true;
+                        }
+                    });
+                });
+            });
+        }
+        if pending_cancel { self.form_task = None; }
+        if pending_save {
+            if let Some(task) = self.form_task.take() {
+                let task = Box::new(task);
+
+                if task.id == self.next_task_id {
+                    self.next_task_id += 1;
+                }
+
+                match self.arrange_parent_task.take() {
+                    Some(mut parent_task) => {
+                        parent_task.add_subtask(task);
+                        self.arrange_parent_task = Some(parent_task.clone());
+                        self.oswald.add_task(Box::new(parent_task));
+                    },
+                    None => {
+                        self.oswald.add_task(task);
+                    }
+                }
+            }
+        }
     }
 }
 impl eframe::App for Tako {
@@ -384,10 +464,12 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
         let mut next_task_id: u32 = 1;
 
         for task in oswald.get_all_tasks() {
-            next_task_id = max(next_task_id, task.id);
+            next_task_id = max(next_task_id, task.id + 1);
         }
         Ok(Box::new(Tako {
             oswald, 
+            form_task: None,
+            form_task_desc: "".to_string(),
             arrange_parent_task: None,
             arrange_prev_parents: vec![],
             current_view: View::Overview,
