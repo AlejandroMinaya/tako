@@ -70,7 +70,6 @@ impl Task {
     fn delta_update(&mut self, delta: &Vec2, area: &Rect) {
         let urgency_delta = delta.x / area.width() * DRAG_SPEED;
         let importance_delta = -delta.y / area.height() * DRAG_SPEED;
-        dbg!(delta, urgency_delta, importance_delta);
         self.urgency += urgency_delta;
         self.importance += importance_delta;
     }
@@ -373,6 +372,20 @@ impl Tako {
                                 }
                             }
 
+                            match &mut self.arrange_parent_task {
+                                Some(parent) => {
+                                    updated_tasks.into_iter().for_each(|task| {
+                                        parent.add_subtask(task);
+                                    });
+                                    self.oswald.add_task(Box::new(parent.clone()))
+                                },
+                                None => {
+                                    updated_tasks.into_iter().for_each(|task| {
+                                        self.oswald.add_task(task);
+                                    });
+                                }
+                            }
+
                             if let Some(new_parent) = new_parent_task.take() {
                                 if let Some(old_parent) = self.arrange_parent_task.take() {
                                     self.arrange_prev_parents.push(old_parent);
@@ -380,9 +393,6 @@ impl Tako {
                                 self.arrange_parent_task = Some(new_parent);
                             }
 
-                            updated_tasks.into_iter().for_each(|task| {
-                                self.oswald.add_task(task);
-                            });
                         });
                 });
             });
