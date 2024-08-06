@@ -281,6 +281,7 @@ impl Tako {
                         self.current_view = View::Arrange;
                     }
                     if self.tako_full_button(ui, "Clear All", false).clicked() {
+                        self.clear_all_dialog = true;
                     }
                 });
             });
@@ -434,7 +435,6 @@ impl eframe::App for Tako {
         let tasks = self.oswald.get_tasks();
         match serde_json::to_string(&tasks) {
             Ok(tasks_str) => { 
-                dbg!(&tasks_str);
                 storage.set_string("tasks", tasks_str);
             },
             Err(err) => { println!("Couldn't save tasks: {err}") }
