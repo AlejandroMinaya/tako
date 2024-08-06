@@ -298,7 +298,18 @@ impl Tako {
     fn show_arrange_frame(&mut self, ui: &mut Ui, ctx: &Context) {
         Frame::default()
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        if self.arrange_parent_task.is_some() {
+                            if ui.button("Home").clicked() {
+                                self.arrange_prev_parents.clear();
+                                self.arrange_parent_task = None;
+                            };
+                            if ui.button("Back").clicked() {
+                                self.arrange_parent_task = self.arrange_prev_parents.pop()
+                            }
+                        }
+                    });
                     let (_, area_rect) = ui.allocate_space(ui.available_size());
                     Area::new("Arrange".into())
                         .movable(true)
