@@ -4,6 +4,7 @@ use egui::{
     ViewportBuilder,
     Color32,
     Vec2,
+    Pos2,
     Ui,
     Frame,
     SidePanel,
@@ -15,6 +16,10 @@ use egui::{
     FontId,
     ScrollArea,
     FontFamily,
+    Rect,
+    Area,
+    Id,
+    CursorIcon,
     text::LayoutJob
 };
 use eframe::{
@@ -22,7 +27,7 @@ use eframe::{
     Storage,
     run_native
 };
-use crate::core::tasks::{Oswald, Task};
+use crate::core::tasks::{Oswald, Task, BoxTaskVec};
 
 const INNER_MARGIN: f32 = 0.0;
 const MENU_WIDTH: f32 = 144.0;
@@ -48,7 +53,77 @@ const TASK_PADDING: f32 = 16.0;
 const TASK_RADIUS: f32 = 8.0;
 const TASK_SIZE: Vec2 = Vec2 { x: 120.0, y: 80.0 };
 
+fn norm_value(curr: f32, min_val: f32, max_val: f32) -> f32 {
+    if max_val == min_val {
+        return 0.0;
+    }
+    return (curr - min_val) / (max_val - min_val);
+}
+
 impl Task { 
+    fn delta_update(&mut self, delta: Vec2, stats: &Stats, area: &Rect) {
+        self.urgency += (delta.x/area.width()) * (stats.max_urgency - stats.min_urgency) + stats.min_urgency;
+        self.importance += (delta.y/area.height()) * (stats.max_importance - stats.min_importance) + stats.min_importance;
+    }
+    fn get_arrange_rect(&self, ui: &Ui, stats: &Stats, area: &Rect) -> Rect {
+        let norm_importance =  norm_value(self.importance, stats.min_importance, stats.max_importance);
+        let norm_urgency =  norm_value(self.urgency, stats.min_urgency, stats.max_urgency);
+        let half_task_width = TASK_SIZE.x/2.0;
+        let half_task_height = TASK_SIZE.y/2.0;
+
+        let area_width = area.width();
+        let area_height = area.height();
+
+        let center = Pos2 {
+            x: area.min.x + area_width/2.0 + norm_urgency * area_width,
+            y: area.min.y + area_height/2.0 + norm_importance * area_height
+        };
+        let top_left = Pos2 {
+            x: center.x - half_task_width,
+            y: center.y - half_task_height
+        };
+        let bottom_right = Pos2 {
+            x: center.x + half_task_width,
+            y: center.y + half_task_height
+        };
+        Rect { min: top_left, max: bottom_right }
+    }
+    fn show_arrange(&self, ui: &mut Ui, stats: &Stats, area: &Rect) -> Response {
+        let task_rect = self.get_arrange_rect(ui, stats, area);
+        let _ = ui.allocate_rect(task_rect, Sense::click_and_drag());
+        let id = Id::new(format!("task_{}", self.id));
+        let response = ui.interact(task_rect, id, Sense::click_and_drag());
+        let background_color = 
+            if response.hovered() {
+                TASK_HOVERED_BG
+            } else {
+                TASK_BG
+            };
+        let content_rect = task_rect.shrink(TASK_PADDING);
+        let mut text_layout = LayoutJob::simple(
+            self.desc.clone(),
+            FontId { size: TASK_FONT_SIZE, family: FontFamily::Monospace },
+            TASK_FG,
+            content_rect.width()
+        );
+        text_layout.halign = Align::Center;
+        let mut text_pos = Align2::CENTER_CENTER.pos_in_rect(&content_rect);
+        text_pos.y -= TASK_FONT_SIZE/2.0;
+
+        let text_galley = ui.painter().layout_job(text_layout);
+        ui.painter().rect_filled(task_rect, TASK_RADIUS, background_color); 
+        ui.painter().galley(text_pos, text_galley, TASK_FG);
+
+        if response.hovered () {
+            ui.ctx().set_cursor_icon(CursorIcon::Grab);
+        }
+        if response.dragged() {
+            ui.ctx().set_cursor_icon(CursorIcon::Move);
+        }
+
+        response
+    }
+
     fn show_overview(&mut self, ui: &mut Ui) -> Response {
         let (task_rect, response) = ui.allocate_at_least(TASK_SIZE, Sense::click());
         let mut background_color = 
@@ -59,7 +134,8 @@ impl Task {
             };
         let complexity: f32 = self.get_complexity() as f32;
         if complexity > 1.0 {
-            background_color = background_color.gamma_multiply(1.0/complexity);
+            background_color = background_color.gamma_multiply(1.0/complexity
+            );
         }
         let content_rect = task_rect.shrink(TASK_PADDING);
         let mut text_layout = LayoutJob::simple(
@@ -90,12 +166,20 @@ enum View {
     #[default]
     Overview
 }
+struct Stats {
+    next_task_id: u32,
+    max_urgency: f32,
+    min_urgency: f32,
+    max_importance: f32,
+    min_importance: f32
+}
 struct Tako {
     oswald: Oswald,
     current_view: View,
     target_daily_tasks: usize,
     overview_columns: usize,
-    next_task_id: u32
+    arrange_parent_task: Option<Task>,
+    stats: Stats
 }
 impl Tako {
     fn tako_full_button(&self, ui: &mut Ui, text: &str, selected: bool) -> Response {
@@ -171,11 +255,45 @@ impl Tako {
                 });
             });
     }
-    fn show_arrange_frame(&mut self, ui: &mut Ui) {
+    fn show_arrange_frame(&mut self, ui: &mut Ui, ctx: &Context) {
         Frame::default()
-            .fill(Color32::GREEN)
             .show(ui, |ui| {
-                dbg!(ui.available_size());
+                let (_, rect) = ui.allocate_space(ui.available_size());
+                Area::new("Arrange".into())
+                    .movable(true)
+                    .default_size(ui.available_size())
+                    .constrain_to(rect)
+                    .show(ctx, |ui| {
+                        let parent_task = self.arrange_parent_task.take();
+                        let tasks = match &parent_task {
+                            Some(parent_task) => parent_task.get_subtasks(),
+                            None => self.oswald.get_tasks()
+                        };
+                        let mut updated_tasks: BoxTaskVec = vec![];
+                        for task in tasks {
+                            let response = task.show_arrange(ui, &self.stats, &rect);
+                            if response.double_clicked() {
+                                self.arrange_parent_task = Some(task.clone());
+                            }
+
+                            if response.dragged() {
+                                let delta = response.drag_delta();
+                                if delta != Vec2::ZERO {
+                                    let mut task = task.clone();
+                                    dbg!(
+                                        &response.id,
+                                        &task.importance,
+                                        &task.urgency,
+                                        response.drag_motion(),
+                                        response.drag_delta()
+                                    );
+                                    task.delta_update(response.drag_delta(), &self.stats, &rect);
+                                    updated_tasks.push(Box::new(task));
+                                }
+                            }
+                        }
+                        updated_tasks.into_iter().for_each(|task| self.oswald.add_task(task));
+                });
             });
     }
 }
@@ -193,7 +311,7 @@ impl eframe::App for Tako {
         CentralPanel::default().show(ctx, |ui| {
             match self.current_view {
                 View::Overview => self.show_overview_frame(ui),
-                View::Arrange => self.show_arrange_frame(ui)
+                View::Arrange => self.show_arrange_frame(ui, ctx)
             }
         });
     }
@@ -210,12 +328,32 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
             let raw_tasks: Vec<Task> = serde_json::from_str(&tasks_str)?;
             for task in raw_tasks { oswald.add_task(Box::new(task)); }
         }
+        let mut next_task_id: u32 = 1;
+        let mut max_importance: f32 = 0.0;
+        let mut min_importance: f32 = f32::MAX;
+        let mut max_urgency: f32 = 0.0;
+        let mut min_urgency: f32 = f32::MAX;
+
+        for task in oswald.get_all_tasks() {
+            next_task_id = max(next_task_id, task.id);
+            max_importance = f32::max(max_importance, task.importance);
+            min_importance = f32::min(min_importance, task.importance);
+            max_urgency = f32::max(max_urgency, task.urgency);
+            min_urgency = f32::min(min_urgency, task.urgency);
+        }
         Ok(Box::new(Tako {
             oswald, 
+            arrange_parent_task: None,
             current_view: View::Overview,
             target_daily_tasks: 5,
             overview_columns: 3,
-            next_task_id: 1
+            stats: Stats {
+                next_task_id,
+                max_importance,
+                min_importance,
+                max_urgency,
+                min_urgency
+           }
         }))
     }))
 }
