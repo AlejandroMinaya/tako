@@ -67,10 +67,11 @@ fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
     return (curr - min_val) / (max_val - min_val);
 }
 
+
 impl Task { 
-    fn delta_update(&mut self, delta: Vec2) {
-        self.urgency += delta.x/DRAG_SCALE_FACTOR;
-        self.importance += delta.y/DRAG_SCALE_FACTOR;
+    fn delta_update(&mut self, delta: &Vec2, area: &Rect, stats: &Stats) {
+        self.urgency += (delta.x / area.width()) * (stats.max_urgency - stats.min_urgency) + f32::max(stats.min_urgency, 0.0);
+        self.importance += (delta.y / area.height()) * (stats.max_importance - stats.min_importance) + f32::max(stats.min_importance, 0.0);
     }
     fn get_arrange_rect(&self, ui: &Ui, stats: &Stats, area: &Rect) -> Rect {
         let norm_importance =  norm_value(self.importance, stats.min_importance, stats.max_importance);
@@ -79,6 +80,16 @@ impl Task {
         let half_task_width = TASK_SIZE.x/2.0;
         let half_task_height = TASK_SIZE.y/2.0;
 
+        let area = Rect {
+            min: Pos2 {
+                x: area.min.x + half_task_width,
+                y: area.min.y + half_task_height
+            },
+            max: Pos2 {
+                x: area.max.x - half_task_width,
+                y: area.max.y - half_task_height
+            }
+        };
         let area_width = area.width();
         let area_height = area.height();
 
@@ -177,11 +188,29 @@ enum View {
 
 #[derive(Debug)]
 struct Stats {
-    next_task_id: u32,
     max_urgency: f32,
     min_urgency: f32,
     max_importance: f32,
     min_importance: f32
+}
+impl Stats {
+    fn from_tasks(tasks: &Vec<&Task>) -> Stats {
+        let mut stats = Stats {
+            max_importance: 0.0,
+            min_importance: f32::MAX,
+            max_urgency: 0.0,
+            min_urgency: f32::MAX,
+        };
+
+        for task in tasks {
+            stats.max_importance = f32::max(stats.max_importance, task.importance);
+            stats.min_importance = f32::min(stats.min_importance, task.importance);
+            stats.max_urgency = f32::max(stats.max_urgency, task.urgency);
+            stats.min_urgency = f32::min(stats.min_urgency, task.urgency);
+        }
+
+        stats
+    }
 }
 struct Tako {
     oswald: Oswald,
@@ -189,7 +218,8 @@ struct Tako {
     target_daily_tasks: usize,
     overview_columns: usize,
     arrange_parent_task: Option<Task>,
-    stats: Stats
+    arrange_prev_parents: Vec<Task>,
+    next_task_id: u32
 }
 impl Tako {
     fn tako_full_button(&self, ui: &mut Ui, text: &str, selected: bool) -> Response {
@@ -274,26 +304,33 @@ impl Tako {
                     .default_size(ui.available_size())
                     .constrain_to(rect)
                     .show(ctx, |ui| {
-                        let parent_task = self.arrange_parent_task.take();
-                        let tasks = match &parent_task {
+                        let tasks = match &self.arrange_parent_task {
                             Some(parent_task) => parent_task.get_subtasks(),
                             None => self.oswald.get_tasks()
                         };
                         let mut updated_tasks: BoxTaskVec = vec![];
+                        let mut new_parent_task: Option<Task> = None;
+                        let task_stats = Stats::from_tasks(&tasks);
                         for task in tasks {
-                            let response = task.show_arrange(ui, &self.stats, &rect);
+                            let response = task.show_arrange(ui, &task_stats, &rect);
                             if response.double_clicked() {
-                                self.arrange_parent_task = Some(task.clone());
+                                new_parent_task = Some(task.clone());
                             }
 
                             if response.dragged() {
                                 let delta = response.drag_motion();
                                 if delta != Vec2::ZERO {
                                     let mut task = task.clone();
-                                    task.delta_update(delta);
+                                    task.delta_update(&delta, &rect, &task_stats);
                                     updated_tasks.push(Box::new(task));
                                 }
                             }
+                        }
+                        if let Some(new_parent) = new_parent_task.take() {
+                            if let Some(old_parent) = self.arrange_parent_task.take() {
+                                self.arrange_prev_parents.push(old_parent);
+                            }
+                            self.arrange_parent_task = Some(new_parent);
                         }
                         updated_tasks.into_iter().for_each(|task| self.oswald.add_task(task));
                 });
@@ -332,31 +369,18 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
             for task in raw_tasks { oswald.add_task(Box::new(task)); }
         }
         let mut next_task_id: u32 = 1;
-        let mut max_importance: f32 = 0.0;
-        let mut min_importance: f32 = f32::MAX;
-        let mut max_urgency: f32 = 0.0;
-        let mut min_urgency: f32 = f32::MAX;
 
         for task in oswald.get_all_tasks() {
             next_task_id = max(next_task_id, task.id);
-            max_importance = f32::max(max_importance, task.importance);
-            min_importance = f32::min(min_importance, task.importance);
-            max_urgency = f32::max(max_urgency, task.urgency);
-            min_urgency = f32::min(min_urgency, task.urgency);
         }
         Ok(Box::new(Tako {
             oswald, 
             arrange_parent_task: None,
+            arrange_prev_parents: vec![],
             current_view: View::Overview,
             target_daily_tasks: 5,
             overview_columns: 3,
-            stats: Stats {
-                next_task_id,
-                max_importance,
-                min_importance,
-                max_urgency,
-                min_urgency
-           }
+            next_task_id,
         }))
     }))
 }
