@@ -671,6 +671,10 @@ impl Oswald {
         self.root.get_all_subtasks()
     }
 
+    pub fn clear(&mut self) {
+        todo!();
+    }
+
     // TODO: Use status type design pattern in the future
     pub async fn load(&mut self) -> anyhow::Result<()> {
         let tasks = self.data_store.read().await?;
@@ -737,6 +741,19 @@ mod oswald_tests {
         oswald.add_task(task);
 
         assert!(oswald.root.subtasks_map.contains_key(&1));
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut oswald = Oswald::new(MockDataStore::default());
+        let task = Box::new(Task::new_with_id(1));
+
+        oswald.add_task(task);
+
+        assert!(oswald.root.subtasks_map.contains_key(&1));
+
+        oswald.clear();
+        assert!(oswald.root.subtasks_map.is_empty());
     }
 
     #[sqlx::test]

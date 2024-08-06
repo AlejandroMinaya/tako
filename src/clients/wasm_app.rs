@@ -226,6 +226,7 @@ struct Tako {
     form_task: Option<Task>,
     arrange_parent_task: Option<Task>,
     arrange_prev_parents: Vec<Task>,
+    clear_all_dialog: bool,
     next_task_id: u32
 }
 impl Tako {
@@ -279,8 +280,21 @@ impl Tako {
                     if self.tako_full_button(ui, "Arrange", matches!(self.current_view, View::Arrange)).clicked() {
                         self.current_view = View::Arrange;
                     }
+                    if self.tako_full_button(ui, "Clear All", false).clicked() {
+                    }
                 });
             });
+            Window::new("Are you sure?")
+                .open(&mut self.clear_all_dialog)
+                .show(ctx, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.label("This will DELETE all your tasks, are you sure?");
+                        if ui.button("Yes, I understand").clicked() {
+                            self.oswald.clear();
+                        }
+                    });
+                });
+
     }
 
     fn show_overview_frame(&mut self, ui: &mut Ui) {
@@ -419,7 +433,10 @@ impl eframe::App for Tako {
     fn save(&mut self, storage: &mut dyn Storage) {
         let tasks = self.oswald.get_tasks();
         match serde_json::to_string(&tasks) {
-            Ok(tasks_str) => { storage.set_string("tasks", tasks_str) },
+            Ok(tasks_str) => { 
+                dbg!(&tasks_str);
+                storage.set_string("tasks", tasks_str);
+            },
             Err(err) => { println!("Couldn't save tasks: {err}") }
         }
     }
@@ -453,13 +470,14 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
         }
         Ok(Box::new(Tako {
             oswald, 
+            next_task_id,
             form_task: None,
             arrange_parent_task: None,
             arrange_prev_parents: vec![],
             current_view: View::Overview,
             target_daily_tasks: 5,
             overview_columns: 3,
-            next_task_id,
+            clear_all_dialog: false,
         }))
     }))
 }
