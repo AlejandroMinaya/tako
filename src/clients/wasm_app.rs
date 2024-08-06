@@ -298,11 +298,14 @@ impl Tako {
     fn show_arrange_frame(&mut self, ui: &mut Ui, ctx: &Context) {
         Frame::default()
             .show(ui, |ui| {
-                let (_, rect) = ui.allocate_space(ui.available_size());
+
+
+
+                let (_, area_rect) = ui.allocate_space(ui.available_size());
                 Area::new("Arrange".into())
                     .movable(true)
                     .default_size(ui.available_size())
-                    .constrain_to(rect)
+                    .constrain_to(area_rect)
                     .show(ctx, |ui| {
                         let tasks = match &self.arrange_parent_task {
                             Some(parent_task) => parent_task.get_subtasks(),
@@ -312,7 +315,7 @@ impl Tako {
                         let mut new_parent_task: Option<Task> = None;
                         let task_stats = Stats::from_tasks(&tasks);
                         for task in tasks {
-                            let response = task.show_arrange(ui, &task_stats, &rect);
+                            let response = task.show_arrange(ui, &task_stats, &area_rect);
                             if response.double_clicked() {
                                 new_parent_task = Some(task.clone());
                             }
@@ -321,7 +324,7 @@ impl Tako {
                                 let delta = response.drag_motion();
                                 if delta != Vec2::ZERO {
                                     let mut task = task.clone();
-                                    task.delta_update(&delta, &rect, &task_stats);
+                                    task.delta_update(&delta, &area_rect, &task_stats);
                                     updated_tasks.push(Box::new(task));
                                 }
                             }
