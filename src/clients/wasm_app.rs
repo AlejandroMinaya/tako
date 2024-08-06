@@ -253,7 +253,7 @@ impl Tako {
                 let text_galley = ui.painter().layout_job(text_layout);
                 ui.painter().rect_filled(rect, BUTTON_RADIUS, background_color);
                 ui.painter().galley(text_pos, text_galley, BUTTON_FG);
-        });
+            });
 
         response
     }
@@ -263,17 +263,17 @@ impl Tako {
             .exact_width(MENU_WIDTH)
             .resizable(false)
             .show(ctx, |ui| {
-            ui.vertical_centered(|ui| {
-                ui.heading("tako");
-                ui.spacing();
-                if self.tako_full_button(ui, "Overview", matches!(self.current_view, View::Overview)).clicked() {
-                    self.current_view = View::Overview;
-                }
-                if self.tako_full_button(ui, "Arrange", matches!(self.current_view, View::Arrange)).clicked() {
-                    self.current_view = View::Arrange;
-                }
+                ui.vertical_centered(|ui| {
+                    ui.heading("tako");
+                    ui.spacing();
+                    if self.tako_full_button(ui, "Overview", matches!(self.current_view, View::Overview)).clicked() {
+                        self.current_view = View::Overview;
+                    }
+                    if self.tako_full_button(ui, "Arrange", matches!(self.current_view, View::Arrange)).clicked() {
+                        self.current_view = View::Arrange;
+                    }
+                });
             });
-        });
     }
 
     fn show_overview_frame(&mut self, ui: &mut Ui) {
@@ -298,44 +298,43 @@ impl Tako {
     fn show_arrange_frame(&mut self, ui: &mut Ui, ctx: &Context) {
         Frame::default()
             .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    let (_, area_rect) = ui.allocate_space(ui.available_size());
+                    Area::new("Arrange".into())
+                        .movable(true)
+                        .default_size(ui.available_size())
+                        .constrain_to(area_rect)
+                        .show(ctx, |ui| {
+                            let tasks = match &self.arrange_parent_task {
+                                Some(parent_task) => parent_task.get_subtasks(),
+                                None => self.oswald.get_tasks()
+                            };
+                            let mut updated_tasks: BoxTaskVec = vec![];
+                            let mut new_parent_task: Option<Task> = None;
+                            let task_stats = Stats::from_tasks(&tasks);
+                            for task in tasks {
+                                let response = task.show_arrange(ui, &task_stats, &area_rect);
+                                if response.double_clicked() {
+                                    new_parent_task = Some(task.clone());
+                                }
 
-
-
-                let (_, area_rect) = ui.allocate_space(ui.available_size());
-                Area::new("Arrange".into())
-                    .movable(true)
-                    .default_size(ui.available_size())
-                    .constrain_to(area_rect)
-                    .show(ctx, |ui| {
-                        let tasks = match &self.arrange_parent_task {
-                            Some(parent_task) => parent_task.get_subtasks(),
-                            None => self.oswald.get_tasks()
-                        };
-                        let mut updated_tasks: BoxTaskVec = vec![];
-                        let mut new_parent_task: Option<Task> = None;
-                        let task_stats = Stats::from_tasks(&tasks);
-                        for task in tasks {
-                            let response = task.show_arrange(ui, &task_stats, &area_rect);
-                            if response.double_clicked() {
-                                new_parent_task = Some(task.clone());
-                            }
-
-                            if response.dragged() {
-                                let delta = response.drag_motion();
-                                if delta != Vec2::ZERO {
-                                    let mut task = task.clone();
-                                    task.delta_update(&delta, &area_rect, &task_stats);
-                                    updated_tasks.push(Box::new(task));
+                                if response.dragged() {
+                                    let delta = response.drag_motion();
+                                    if delta != Vec2::ZERO {
+                                        let mut task = task.clone();
+                                        task.delta_update(&delta, &area_rect, &task_stats);
+                                        updated_tasks.push(Box::new(task));
+                                    }
                                 }
                             }
-                        }
-                        if let Some(new_parent) = new_parent_task.take() {
-                            if let Some(old_parent) = self.arrange_parent_task.take() {
-                                self.arrange_prev_parents.push(old_parent);
+                            if let Some(new_parent) = new_parent_task.take() {
+                                if let Some(old_parent) = self.arrange_parent_task.take() {
+                                    self.arrange_prev_parents.push(old_parent);
+                                }
+                                self.arrange_parent_task = Some(new_parent);
                             }
-                            self.arrange_parent_task = Some(new_parent);
-                        }
-                        updated_tasks.into_iter().for_each(|task| self.oswald.add_task(task));
+                            updated_tasks.into_iter().for_each(|task| self.oswald.add_task(task));
+                        });
                 });
             });
     }
