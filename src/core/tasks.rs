@@ -159,6 +159,13 @@ impl Ord for Task {
             return self.status.cmp(&other.status);
         }
 
+        // Compare complexity
+        let self_complexity = self.get_complexity();
+        let other_complexity = other.get_complexity();
+        if self_complexity != other_complexity {
+            return self_complexity.cmp(&other_complexity);
+        }
+
         // Compare (urgency, importance)
         let dist = self.get_distance();
         let other_dist = other.get_distance();
@@ -167,13 +174,6 @@ impl Ord for Task {
         }
         if dist < other_dist {
             return Ordering::Greater;
-        }
-
-        // Compare complexity
-        let self_complexity = self.get_complexity();
-        let other_complexity = other.get_complexity();
-        if self_complexity != other_complexity {
-            return self_complexity.cmp(&other_complexity);
         }
 
         // Compare IDs
