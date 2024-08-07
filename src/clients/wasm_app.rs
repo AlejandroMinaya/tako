@@ -148,7 +148,7 @@ impl Task {
         response
     }
 
-    fn show_overview(&mut self, ui: &mut Ui) -> Response {
+    fn show_overview(&self, ui: &mut Ui) -> Response {
         let (task_rect, response) = ui.allocate_at_least(TASK_SIZE, Sense::click());
         let mut background_color = 
             if response.hovered() {
@@ -223,8 +223,7 @@ struct Tako {
     target_daily_tasks: usize,
     overview_columns: usize,
     form_task: Option<Task>,
-    arrange_parent_task: Option<Task>,
-    arrange_prev_parents: Vec<Task>,
+    arrange_nested_tasks: Vec<Task>,
     clear_all_dialog: bool,
     next_task_id: u32
 }
@@ -306,8 +305,7 @@ impl Tako {
                 ScrollArea::vertical().show(ui, |ui| {
                     ui.columns(self.overview_columns, |columns| {
                         for (idx, task) in enumerated_tasks {
-                            if idx > 0 && idx % self.target_daily_tasks == 0 { curr_column -= 1; }
-                            let mut task = task.clone();
+                            if idx > 0 && idx % self.target_daily_tasks == 0 && curr_column >= 1 { curr_column -= 1; }
                             if let Some(column) = columns.get_mut(curr_column) {
                                 task.show_overview(column);
                             }
@@ -322,20 +320,21 @@ impl Tako {
             .show(ui, |ui| {
                 ui.vertical(|ui| {
                     ui.horizontal(|ui| {
-                        if ui.add_sized(Vec2::new(144.0, 16.0), Button::new("Add Task")).clicked() {
-                            self.form_task = Some(Task::new_with_id(self.next_task_id));
-                        }
                         ui.horizontal(|ui| {
-                            if self.arrange_parent_task.is_some() {
+                            if let Some(parent_task) = self.arrange_nested_tasks.last() {
+                                ui.label(parent_task.desc.clone());
+
                                 if ui.button("Home").clicked() {
-                                    self.arrange_prev_parents.clear();
-                                    self.arrange_parent_task = None;
+                                    self.arrange_nested_tasks.clear();
                                 };
                                 if ui.button("Back").clicked() {
-                                    self.arrange_parent_task = self.arrange_prev_parents.pop()
+                                    self.arrange_nested_tasks.pop();
                                 }
                             }
                         });
+                        if ui.add_sized(Vec2::new(144.0, 16.0), Button::new("Add Task")).clicked() {
+                            self.form_task = Some(Task::new_with_id(self.next_task_id));
+                        }
                     });
                     ui.separator();
                     let (_, area_rect) = ui.allocate_space(ui.available_size());
@@ -344,7 +343,7 @@ impl Tako {
                         .default_size(ui.available_size())
                         .constrain_to(area_rect)
                         .show(ctx, |ui| {
-                            let tasks = match &self.arrange_parent_task {
+                            let tasks = match self.arrange_nested_tasks.last() {
                                 Some(parent_task) => parent_task.get_subtasks(),
                                 None => self.oswald.get_tasks()
                             };
@@ -371,27 +370,25 @@ impl Tako {
                                 }
                             }
 
-                            match &mut self.arrange_parent_task {
-                                Some(parent) => {
-                                    updated_tasks.into_iter().for_each(|task| {
-                                        parent.add_subtask(task);
-                                    });
-                                    self.oswald.add_task(Box::new(parent.clone()))
-                                },
-                                None => {
-                                    updated_tasks.into_iter().for_each(|task| {
-                                        self.oswald.add_task(task);
-                                    });
+                            if !updated_tasks.is_empty() { 
+                                match &mut self.arrange_nested_tasks.last_mut() {
+                                    Some(parent) => {
+                                        updated_tasks.into_iter().for_each(|task| {
+                                            parent.add_subtask(task);
+                                        });
+                                    },
+                                    None => {
+                                        updated_tasks.into_iter().for_each(|task| {
+                                            self.oswald.add_task(task);
+                                        });
+                                    }
                                 }
+                                self.save_arrange();
                             }
 
-                            if let Some(new_parent) = new_parent_task.take() {
-                                if let Some(old_parent) = self.arrange_parent_task.take() {
-                                    self.arrange_prev_parents.push(old_parent);
-                                }
-                                self.arrange_parent_task = Some(new_parent);
+                            if let Some(new_parent_task) = new_parent_task.take() {
+                                self.arrange_nested_tasks.push(new_parent_task);
                             }
-
                         });
                 });
             });
@@ -425,28 +422,28 @@ impl Tako {
                     self.next_task_id += 1;
                 }
 
-                match self.arrange_parent_task.take() {
-                    Some(mut parent_task) => {
+                match self.arrange_nested_tasks.last_mut() {
+                    Some(parent_task) => {
                         parent_task.add_subtask(task);
-                        self.arrange_parent_task = Some(parent_task.clone());
-
-                        let boxed_task = Box::new(parent_task);
-                        match self.arrange_prev_parents.pop().take() {
-                            Some(mut grand_parent) => {
-                                grand_parent.add_subtask(boxed_task);
-                                self.arrange_prev_parents.push(grand_parent.clone());
-                                self.oswald.add_task(Box::new(grand_parent));
-                            },
-                            None => {
-                                self.oswald.add_task(boxed_task);
-                            }
-                        }
                     },
                     None => {
                         self.oswald.add_task(task);
                     }
                 }
+                self.save_arrange();
             }
+        }
+    }
+    fn save_arrange(&mut self) {
+        let mut curr: Option<Task> = None;
+        for task in self.arrange_nested_tasks.iter_mut().rev() {
+            if let Some(prev_task) = curr.take() {
+                task.add_subtask(Box::new(prev_task));
+            }
+            curr = Some(task.clone());
+        }
+        if let Some(last_task) = curr.take() {
+            self.oswald.add_task(Box::new(last_task));
         }
     }
 }
@@ -492,8 +489,7 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
             oswald, 
             next_task_id,
             form_task: None,
-            arrange_parent_task: None,
-            arrange_prev_parents: vec![],
+            arrange_nested_tasks: vec![],
             current_view: View::Overview,
             target_daily_tasks: 5,
             overview_columns: 3,
