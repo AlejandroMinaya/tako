@@ -784,6 +784,10 @@ impl Oswald {
         self.root.get_all_subtasks()
     }
 
+    pub fn delete_task(&mut self, id: u32) {
+        todo!();
+    }
+
     pub fn clear(&mut self) {
         self.root = Task::default();
     }
@@ -854,6 +858,44 @@ mod oswald_tests {
         oswald.add_task(task);
 
         assert!(oswald.root.subtasks_map.contains_key(&1));
+    }
+
+    #[test]
+    fn test_delete_task_by_id() {
+        /*
+         *           (t)
+         *          /   \
+         *       (sA)   (sB)
+         *             /   \
+         *           (sC) (sD)
+         *                 |
+         *                (sE)
+         */
+        let mut oswald = Oswald::new(MockDataStore::default());
+        // Level 1
+        let subtask_a = Box::new(Task::new_with_id(1));
+        let mut subtask_b = Box::new(Task::new_with_id(2));
+        // Level 2
+        let subtask_c = Box::new(Task::new_with_id(3));
+        let mut subtask_d = Box::new(Task::new_with_id(4));
+        // Level 3
+        let subtask_e = Box::new(Task::new_with_id(5));
+
+        subtask_d.add_subtask(subtask_e);
+
+        subtask_b.add_subtask(subtask_d);
+        subtask_b.add_subtask(subtask_c);
+
+        oswald.add_task(subtask_b);
+        oswald.add_task(subtask_a);
+
+        oswald.delete_task(1);
+        oswald.delete_task(4);
+
+        let mut itr = oswald.get_all_tasks().into_iter();
+        assert_eq!(itr.next().expect("Expected Task with id = 3").id, 3);
+        assert_eq!(itr.next().expect("Expected Task with id = 2").id, 2);
+        assert_eq!(itr.next(), None);
     }
 
     #[test]
