@@ -63,6 +63,10 @@ const DONE_TASK_BG: Color32 = Color32::from_rgb(106, 176, 76);
 const DONE_TASK_HOVERED_BG: Color32 = Color32::from_rgb(163, 203, 56);
 const DONE_TASK_FG: Color32 = Color32::WHITE;
 
+const ARCHIVED_TASK_BG: Color32 = Color32::from_rgb(10, 61, 98);
+const ARCHIVED_TASK_HOVERED_BG: Color32 = Color32::from_rgb(60, 99, 130);
+const ARCHIVED_TASK_FG: Color32 = Color32::from_rgb(223, 249, 251);
+
 fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
     if max_val == min_val {
         return 0.0;
@@ -138,11 +142,14 @@ impl egui::Widget for &Task {
         let mut background_color = match task_stat {
             (TaskStatus::Done, true) => DONE_TASK_HOVERED_BG,
             (TaskStatus::Done, false) => DONE_TASK_BG,
+            (TaskStatus::Archived, true) => ARCHIVED_TASK_HOVERED_BG,
+            (TaskStatus::Archived, false) => ARCHIVED_TASK_BG,
             (_, true) => TASK_HOVERED_BG,
             (_, false) => TASK_BG
         };
         let font_color = match task_stat {
             (TaskStatus::Done, _) => DONE_TASK_FG,
+            (TaskStatus::Archived, _) => ARCHIVED_TASK_FG,
             _ => TASK_FG
         };
         let complexity = self.get_complexity();
@@ -329,6 +336,7 @@ impl Tako {
                 let mut curr_column = 0;
                 let enumerated_tasks = self.oswald.get_all_tasks().into_iter().enumerate();
                 let mut pending_update_tasks: Vec<Task> = vec![];
+                let mut pending_deletion_ids: Vec<u32> = vec![];
                 ScrollArea::vertical().show(ui, |ui| {
                     ui.columns(self.overview_columns, |columns| {
                         for (idx, task) in enumerated_tasks {
@@ -340,10 +348,23 @@ impl Tako {
                                 }
 
                                 if response.double_clicked () {
+                                    if matches!(task.status, TaskStatus::Archived) {
+                                        pending_deletion_ids.push(task.id);
+                                    } else {
+                                        let mut updated_task = task.clone();
+                                        updated_task.status = match task.status {
+                                            TaskStatus::Open => TaskStatus::Done,
+                                            TaskStatus::Done => TaskStatus::Open,
+                                            _ => TaskStatus::Archived
+                                        };
+                                        pending_update_tasks.push(updated_task);
+                                    }
+                                }
+
+                                if response.secondary_clicked () {
                                     let mut updated_task = task.clone();
                                     updated_task.status = match task.status {
-                                        TaskStatus::Open => TaskStatus::Done,
-                                        TaskStatus::Done => TaskStatus::Open,
+                                        TaskStatus::Archived => TaskStatus::Open,
                                         _ => TaskStatus::Archived
                                     };
                                     pending_update_tasks.push(updated_task);
@@ -353,7 +374,9 @@ impl Tako {
                     });
                 });
                 pending_update_tasks.into_iter()
-                    .for_each(|task| self.oswald.add_task(Box::new(task)))
+                    .for_each(|task| self.oswald.add_task(Box::new(task)));
+                pending_deletion_ids.into_iter()
+                    .for_each(|id| self.oswald.delete_task(id));
             });
     }
 
