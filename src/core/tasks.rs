@@ -82,7 +82,7 @@ impl Task {
         return sub_itr.fold(1_u32, |result, subtask| result + subtask.get_complexity());
     }
 
-    pub fn _add_subtask(&mut self, subtask: Box<Self>) {
+    fn _add_subtask(&mut self, subtask: Box<Self>) {
         self.subtasks_map.insert(subtask.id, subtask);
     }
     pub fn add_subtask(&mut self, subtask: Box<Self>) {
@@ -90,6 +90,9 @@ impl Task {
             Some(parent) => { parent._add_subtask(subtask); },
             None => { self._add_subtask(subtask); }
         }
+    }
+    pub fn delete_subtask(&mut self, id: u32) {
+        todo!();
     }
 
     pub fn add_subtasks_vec(&mut self, subtasks: BoxTaskVec) {
@@ -247,6 +250,44 @@ mod task_tests {
         assert_eq!(task.get_subtask_parent(4).expect("Expected Task with id = 2").id, 2);
         assert_eq!(task.get_subtask_parent(5).expect("Expected Task with id = 4").id, 4);
         assert_eq!(task.get_subtask_parent(6), None);
+    }
+
+    #[test]
+    fn test_delete_subtask_by_id() {
+        /*
+         *           (t)
+         *          /   \
+         *       (sA)   (sB)
+         *             /   \
+         *           (sC) (sD)
+         *                 |
+         *                (sE)
+         */
+        let mut task = Task::default();
+        // Level 1
+        let subtask_a = Box::new(Task::new_with_id(1));
+        let mut subtask_b = Box::new(Task::new_with_id(2));
+        // Level 2
+        let subtask_c = Box::new(Task::new_with_id(3));
+        let mut subtask_d = Box::new(Task::new_with_id(4));
+        // Level 3
+        let subtask_e = Box::new(Task::new_with_id(5));
+
+        subtask_d.add_subtask(subtask_e);
+
+        subtask_b.add_subtask(subtask_d);
+        subtask_b.add_subtask(subtask_c);
+
+        task.add_subtask(subtask_b);
+        task.add_subtask(subtask_a);
+
+        task.delete_subtask(1);
+        task.delete_subtask(4);
+
+        let mut itr = task.get_all_subtasks().into_iter();
+        assert_eq!(itr.next().expect("Expected Task with id = 3").id, 3);
+        assert_eq!(itr.next().expect("Expected Task with id = 2").id, 2);
+        assert_eq!(itr.next(), None);
     }
 
     #[test]
