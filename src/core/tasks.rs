@@ -581,6 +581,54 @@ mod task_tests {
     }
 
     #[test]
+    fn test_get_task_complexity_multilevel_sort() {
+        /*
+         *           (t)
+         *          /   \
+         *       (sA)   (sB)
+         *             /   \
+         *           (sC) (sD)
+         *                 |
+         *                (sE)
+         */
+        let mut task = Task::default();
+        // Level 1
+        let mut subtask_a = Box::new(Task::new_with_id(1));
+        subtask_a.importance = 10.0;
+        subtask_a.urgency = 10.0;
+
+        let mut subtask_b = Box::new(Task::new_with_id(2));
+        subtask_b.importance = 10.0;
+        subtask_b.urgency = 10.0;
+
+        // Level 2
+        let subtask_c = Box::new(Task::new_with_id(3));
+
+        let mut subtask_d = Box::new(Task::new_with_id(4));
+
+        // Level 3
+        let mut subtask_e = Box::new(Task::new_with_id(5));
+        subtask_e.importance = 8.0;
+        subtask_e.urgency = 8.0;
+
+        subtask_d.add_subtask(subtask_e);
+
+        subtask_b.add_subtask(subtask_d);
+        subtask_b.add_subtask(subtask_c);
+
+        task.add_subtask(subtask_b);
+        task.add_subtask(subtask_a);
+
+        let mut itr = task.get_all_subtasks().into_iter();
+        assert_eq!(itr.next().expect("Expected Task A").id, 1);
+        assert_eq!(itr.next().expect("Expected Task E").id, 5);
+        assert_eq!(itr.next().expect("Expected Task C").id, 3);
+        assert_eq!(itr.next().expect("Expected Task D").id, 4);
+        assert_eq!(itr.next().expect("Expected Task B").id, 2);
+        assert_eq!(itr.next(), None);
+    }
+
+    #[test]
     fn test_collect_all_tasks() {
         /*      
          *            (r)
