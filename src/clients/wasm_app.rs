@@ -49,6 +49,7 @@ const TASK_BG: Color32 = Color32::from_rgb(109, 33, 79);
 const TASK_HOVERED_BG: Color32 = Color32::from_rgb(179, 55, 113);
 const TASK_FG: Color32 = Color32::from_rgb(255, 204, 204);
 const TASK_FONT_SIZE: f32 = 12.0;
+const TASK_SMALL_FONT_SIZE: f32 = 10.0;
 const TASK_PADDING: f32 = 16.0;
 const TASK_RADIUS: f32 = 8.0;
 const TASK_SIZE: Vec2 = Vec2 { x: 120.0, y: 80.0 };
@@ -140,27 +141,37 @@ impl egui::Widget for &Task {
             (TaskStatus::Done, _) => DONE_TASK_FG,
             _ => TASK_FG
         };
-        let complexity = self.get_complexity() as f32;
-        background_color = background_color.gamma_multiply(1.0/complexity);
+        let complexity = self.get_complexity();
+        background_color = background_color.gamma_multiply(1.0/complexity as f32);
         let content_rect = rect.shrink(TASK_PADDING);
 
-        let text_galley = ui.painter().layout(
+
+        ui.painter().rect_filled(rect, TASK_RADIUS, background_color);
+
+        let desc_galley = ui.painter().layout(
             self.desc.clone(),
             FontId { size: TASK_FONT_SIZE, family: FontFamily::Monospace },
             font_color,
             content_rect.width()
         );
+        let y_desc_offset = (content_rect.height() - desc_galley.rect.height()) / 2.0;
+        let desc_pos = Pos2::new(content_rect.min.x, content_rect.min.y + y_desc_offset.max(0.0));
+        ui.painter().galley(desc_pos, desc_galley, background_color);
 
-        let y_offset = (content_rect.height() - text_galley.rect.height()) / 2.0;
-        ui.painter().rect_filled(rect, TASK_RADIUS, background_color);
-        ui.painter().galley(
-            Pos2::new(
-                content_rect.min.x,
-                content_rect.min.y + y_offset.max(0.0)
-            ), 
-            text_galley,
-            background_color
-        );
+
+        if complexity > 1 {
+            let complexity_galley = ui.painter().layout_no_wrap(
+                format!("{}", complexity - 1),
+                FontId { size: TASK_SMALL_FONT_SIZE, family: FontFamily::Monospace },
+                font_color,
+            );
+            let complexity_anchor = Align2::RIGHT_CENTER.pos_in_rect(&content_rect);
+            let complexity_pos = Pos2::new(
+                complexity_anchor.x - complexity_galley.rect.width()/2.0,
+                complexity_anchor.y - complexity_galley.rect.height()/2.0
+            );
+            ui.painter().galley(complexity_pos, complexity_galley, font_color);
+        }
 
         response
     }
