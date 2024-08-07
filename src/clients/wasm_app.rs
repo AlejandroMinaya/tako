@@ -81,8 +81,9 @@ fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
 
 impl Task { 
     fn delta_update(&mut self, delta: &Vec2, area: &Rect, stats: &Stats) {
-        let urgency_delta = delta.x / area.width() * stats.max_urgency;
-        let importance_delta = -delta.y / area.height() * stats.max_importance;
+        let urgency_delta = delta.x / area.width() * stats.range_urgency.max(f32::MIN_POSITIVE);
+        let importance_delta = -delta.y / area.height() * stats.range_importance.max(f32::MIN_POSITIVE);
+        dbg!(urgency_delta, importance_delta, stats.range_urgency, stats.range_importance);
         self.urgency += urgency_delta;
         self.importance += importance_delta;
     }
@@ -199,16 +200,20 @@ enum View {
 struct Stats {
     max_urgency: f32,
     min_urgency: f32,
+    range_urgency: f32,
     max_importance: f32,
-    min_importance: f32
+    min_importance: f32,
+    range_importance: f32
 }
 impl Stats {
     fn from_tasks(tasks: &Vec<&Task>) -> Stats {
         let mut stats = Stats {
             max_importance: 0.0,
             min_importance: f32::MAX,
+            range_importance: 0.0,
             max_urgency: 0.0,
             min_urgency: f32::MAX,
+            range_urgency: 0.0,
         };
 
         for task in tasks {
@@ -217,6 +222,8 @@ impl Stats {
             stats.max_urgency = f32::max(stats.max_urgency, task.urgency);
             stats.min_urgency = f32::min(stats.min_urgency, task.urgency);
         }
+        stats.range_urgency = stats.max_urgency - stats.min_urgency;
+        stats.range_importance = stats.max_importance - stats.min_importance;
 
         stats
     }
@@ -335,8 +342,8 @@ impl Tako {
             .show(ui, |ui| {
                 let mut curr_column = 0;
                 let enumerated_tasks = self.oswald.get_all_tasks().into_iter().enumerate();
-                let mut pending_update_tasks: Vec<Task> = vec![];
-                let mut pending_deletion_ids: Vec<u32> = vec![];
+                let mut pending_update_task: Option<Task> = None;
+                let mut pending_deletion_id: Option<u32> = None;
                 ScrollArea::vertical().show(ui, |ui| {
                     ui.columns(self.overview_columns, |columns| {
                         for (idx, task) in enumerated_tasks {
@@ -349,7 +356,7 @@ impl Tako {
 
                                 if response.double_clicked () {
                                     if matches!(task.status, TaskStatus::Archived) {
-                                        pending_deletion_ids.push(task.id);
+                                        pending_deletion_id = Some(task.id);
                                     } else {
                                         let mut updated_task = task.clone();
                                         updated_task.status = match task.status {
@@ -357,7 +364,7 @@ impl Tako {
                                             TaskStatus::Done => TaskStatus::Open,
                                             _ => TaskStatus::Archived
                                         };
-                                        pending_update_tasks.push(updated_task);
+                                        pending_update_task = Some(updated_task);
                                     }
                                 }
 
@@ -367,16 +374,18 @@ impl Tako {
                                         TaskStatus::Archived => TaskStatus::Open,
                                         _ => TaskStatus::Archived
                                     };
-                                    pending_update_tasks.push(updated_task);
+                                    pending_update_task = Some(updated_task);
                                 }
                             }
                         }
                     });
                 });
-                pending_update_tasks.into_iter()
-                    .for_each(|task| self.oswald.add_task(Box::new(task)));
-                pending_deletion_ids.into_iter()
-                    .for_each(|id| self.oswald.delete_task(id));
+                if let Some(task) = pending_update_task {
+                    self.oswald.add_task(Box::new(task));
+                }
+                if let Some(task_id) = pending_deletion_id {
+                    self.oswald.delete_task(task_id);
+                }
             });
     }
 
@@ -413,7 +422,7 @@ impl Tako {
                                 Some(parent_task) => parent_task.get_subtasks(),
                                 None => self.oswald.get_tasks()
                             };
-                            let mut pending_update_tasks: BoxTaskVec = vec![];
+                            let mut pending_update_task: BoxTaskVec = vec![];
                             let mut new_parent_task: Option<Task> = None;
                             let task_stats = Stats::from_tasks(&tasks);
 
@@ -436,21 +445,21 @@ impl Tako {
                                     if delta != Vec2::ZERO {
                                         let mut task = task.clone();
                                         task.delta_update(&delta, &area_rect, &task_stats);
-                                        pending_update_tasks.push(Box::new(task));
+                                        pending_update_task.push(Box::new(task));
                                     }
                                 }
                             }
                             self.show_arrange_labels(ui, &area_rect);
 
-                            if !pending_update_tasks.is_empty() { 
+                            if !pending_update_task.is_empty() { 
                                 match &mut self.arrange_nested_tasks.last_mut() {
                                     Some(parent) => {
-                                        pending_update_tasks.into_iter().for_each(|task| {
+                                        pending_update_task.into_iter().for_each(|task| {
                                             parent.add_subtask(task);
                                         });
                                     },
                                     None => {
-                                        pending_update_tasks.into_iter().for_each(|task| {
+                                        pending_update_task.into_iter().for_each(|task| {
                                             self.oswald.add_task(task);
                                         });
                                     }
@@ -484,7 +493,7 @@ impl Tako {
                         .constrain_to(area_rect)
                         .show(ctx, |ui| {
                             let tasks = self.oswald.get_all_tasks();
-                            let mut pending_update_tasks: BoxTaskVec = vec![];
+                            let mut pending_update_task: Option<Task> = None;
                             let task_stats = Stats::from_tasks(&tasks);
 
                             for task in tasks {
@@ -504,14 +513,15 @@ impl Tako {
                                     if delta != Vec2::ZERO {
                                         let mut task = task.clone();
                                         task.delta_update(&delta, &area_rect, &task_stats);
-                                        pending_update_tasks.push(Box::new(task));
+                                        pending_update_task = Some(task);
                                     }
                                 }
                             }
                             self.show_arrange_labels(ui, &area_rect);
 
-                            pending_update_tasks.into_iter()
-                                .for_each(|task| self.oswald.add_task(task));
+                            if let Some(task) = pending_update_task {
+                                self.oswald.add_task(Box::new(task));
+                            }
                     });
                 });
             });
