@@ -29,7 +29,7 @@ use eframe::{
     Storage,
     run_native
 };
-use crate::core::tasks::{Oswald, Task, BoxTaskVec};
+use crate::core::tasks::{Oswald, Task, BoxTaskVec, TaskStatus};
 
 const INNER_MARGIN: f32 = 0.0;
 const MENU_WIDTH: f32 = 144.0;
@@ -51,6 +51,10 @@ const TASK_MARGIN: f32 = 2.0;
 const TASK_PADDING: f32 = 16.0;
 const TASK_RADIUS: f32 = 8.0;
 const TASK_SIZE: Vec2 = Vec2 { x: 120.0, y: 80.0 };
+
+const DONE_TASK_BG: Color32 = Color32::from_rgb(163, 203, 56);
+const DONE_TASK_HOVERED_BG: Color32 = Color32::from_rgb(196, 229, 56);
+const DONE_TASK_FG: Color32 = Color32::from_rgb(241, 242, 246);
 
 const DRAG_SPEED: f32 = 12.0;
 
@@ -150,12 +154,17 @@ impl Task {
 
     fn show_overview(&self, ui: &mut Ui) -> Response {
         let (task_rect, response) = ui.allocate_at_least(TASK_SIZE, Sense::click());
-        let mut background_color = 
-            if response.hovered() {
-                TASK_HOVERED_BG
-            } else {
-                TASK_BG
-            };
+        let task_stat = (self.status, response.hovered);
+        let mut background_color = match task_stat {
+            (TaskStatus::Done, true) => DONE_TASK_HOVERED_BG,
+            (TaskStatus::Done, false) => DONE_TASK_BG,
+            (_, true) => TASK_HOVERED_BG,
+            (_, false) => TASK_BG
+        };
+        let font_color = match task_stat {
+            (TaskStatus::Done, _) => DONE_TASK_FG,
+            _ => TASK_FG
+        };
         let complexity: f32 = self.get_complexity() as f32;
         if complexity > 1.0 {
             background_color = background_color.gamma_multiply(1.0/complexity
@@ -165,7 +174,7 @@ impl Task {
         let mut text_layout = LayoutJob::simple(
             self.desc.clone(),
             FontId { size: TASK_FONT_SIZE, family: FontFamily::Monospace },
-            TASK_FG,
+            font_color,
             content_rect.width()
         );
         text_layout.halign = Align::Center;
@@ -177,7 +186,7 @@ impl Task {
             .show(ui, |ui| {
                 let text_galley = ui.painter().layout_job(text_layout);
                 ui.painter().rect_filled(task_rect, TASK_RADIUS, background_color); 
-                ui.painter().galley(text_pos, text_galley, TASK_FG);
+                ui.painter().galley(text_pos, text_galley, font_color);
             });
 
         response
@@ -302,16 +311,28 @@ impl Tako {
             .show(ui, |ui| {
                 let mut curr_column = 0;
                 let enumerated_tasks = self.oswald.get_all_tasks().into_iter().enumerate();
+                let mut pending_update_tasks: Vec<Task> = vec![];
                 ScrollArea::vertical().show(ui, |ui| {
                     ui.columns(self.overview_columns, |columns| {
                         for (idx, task) in enumerated_tasks {
                             if idx > 0 && idx % self.target_daily_tasks == 0 && curr_column < self.overview_columns { curr_column += 1; }
                             if let Some(column) = columns.get_mut(self.overview_columns - curr_column - 1) {
-                                task.show_overview(column);
+                                let response = task.show_overview(column);
+                                if response.double_clicked () {
+                                    let mut updated_task = task.clone();
+                                    updated_task.status = match task.status {
+                                        TaskStatus::Open => TaskStatus::Done,
+                                        TaskStatus::Done => TaskStatus::Open,
+                                        _ => TaskStatus::Archived
+                                    };
+                                    pending_update_tasks.push(updated_task);
+                                }
                             }
                         }
                     });
                 });
+                pending_update_tasks.into_iter()
+                    .for_each(|task| self.oswald.add_task(Box::new(task)))
             });
     }
     fn show_arrange_frame(&mut self, ui: &mut Ui, ctx: &Context) {
@@ -347,7 +368,7 @@ impl Tako {
                                 Some(parent_task) => parent_task.get_subtasks(),
                                 None => self.oswald.get_tasks()
                             };
-                            let mut updated_tasks: BoxTaskVec = vec![];
+                            let mut pending_update_tasks: BoxTaskVec = vec![];
                             let mut new_parent_task: Option<Task> = None;
                             let task_stats = Stats::from_tasks(&tasks);
 
@@ -365,20 +386,20 @@ impl Tako {
                                     if delta != Vec2::ZERO {
                                         let mut task = task.clone();
                                         task.delta_update(&delta, &area_rect);
-                                        updated_tasks.push(Box::new(task));
+                                        pending_update_tasks.push(Box::new(task));
                                     }
                                 }
                             }
 
-                            if !updated_tasks.is_empty() { 
+                            if !pending_update_tasks.is_empty() { 
                                 match &mut self.arrange_nested_tasks.last_mut() {
                                     Some(parent) => {
-                                        updated_tasks.into_iter().for_each(|task| {
+                                        pending_update_tasks.into_iter().for_each(|task| {
                                             parent.add_subtask(task);
                                         });
                                     },
                                     None => {
-                                        updated_tasks.into_iter().for_each(|task| {
+                                        pending_update_tasks.into_iter().for_each(|task| {
                                             self.oswald.add_task(task);
                                         });
                                     }
