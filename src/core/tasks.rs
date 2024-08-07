@@ -785,7 +785,7 @@ impl Oswald {
     }
 
     pub fn delete_task(&mut self, id: u32) {
-        todo!();
+        self.root.delete_subtask(id);
     }
 
     pub fn clear(&mut self) {
