@@ -67,6 +67,8 @@ const ARCHIVED_TASK_BG: Color32 = Color32::from_rgb(10, 61, 98);
 const ARCHIVED_TASK_HOVERED_BG: Color32 = Color32::from_rgb(60, 99, 130);
 const ARCHIVED_TASK_FG: Color32 = Color32::from_rgb(223, 249, 251);
 
+const MIN_DRAG_DELTA: f32 = 1e-12;
+
 fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
     if max_val == min_val {
         return 0.0;
@@ -81,9 +83,10 @@ fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
 
 impl Task { 
     fn delta_update(&mut self, delta: &Vec2, area: &Rect, stats: &Stats) {
-        let urgency_delta = delta.x / area.width() * stats.range_urgency.max(f32::MIN_POSITIVE);
-        let importance_delta = -delta.y / area.height() * stats.range_importance.max(f32::MIN_POSITIVE);
-        dbg!(urgency_delta, importance_delta, stats.range_urgency, stats.range_importance);
+        let mut urgency_delta = delta.x / area.width() * stats.range_urgency.max(f32::MIN_POSITIVE);
+        let mut importance_delta = -delta.y / area.height() * stats.range_importance.max(f32::MIN_POSITIVE);
+        urgency_delta = urgency_delta.signum() * urgency_delta.abs().max(MIN_DRAG_DELTA);
+        importance_delta = importance_delta.signum() * importance_delta.abs().max(MIN_DRAG_DELTA);
         self.urgency += urgency_delta;
         self.importance += importance_delta;
     }
@@ -312,6 +315,8 @@ impl Tako {
                     ui.spacing();
                     if self.tako_full_button(ui, "Overview", matches!(self.current_view, View::Overview)).clicked() {
                         self.current_view = View::Overview;
+                        self.save_arrange();
+                        self.arrange_nested_tasks.clear();
                     }
                     if self.tako_full_button(ui, "Arrange", matches!(self.current_view, View::Arrange)).clicked() {
                         self.current_view = View::Arrange;
@@ -347,7 +352,7 @@ impl Tako {
                 ScrollArea::vertical().show(ui, |ui| {
                     ui.columns(self.overview_columns, |columns| {
                         for (idx, task) in enumerated_tasks {
-                            if idx > 0 && idx % self.target_daily_tasks == 0 && curr_column < self.overview_columns { curr_column += 1; }
+                            if idx > 0 && idx % self.target_daily_tasks == 0 && curr_column < self.overview_columns - 1 { curr_column += 1; }
                             if let Some(column) = columns.get_mut(self.overview_columns - curr_column - 1) {
                                 let response = task.show_overview(column);
                                 if response.hovered() {
@@ -422,7 +427,8 @@ impl Tako {
                                 Some(parent_task) => parent_task.get_subtasks(),
                                 None => self.oswald.get_tasks()
                             };
-                            let mut pending_update_task: BoxTaskVec = vec![];
+                            let mut pending_update_task: Option<Task> = None;
+                            let mut pending_deletion_id: Option<u32> = None;
                             let mut new_parent_task: Option<Task> = None;
                             let task_stats = Stats::from_tasks(&tasks);
 
@@ -433,11 +439,24 @@ impl Tako {
                                     ui.ctx().set_cursor_icon(CursorIcon::Grab);
                                 }
 
-                                if response.triple_clicked() {
+                                if response.middle_clicked() {
                                     self.form_task = Some(task.clone());
-                                } else if response.double_clicked() {
+                                } 
+                                if response.double_clicked() {
                                     new_parent_task = Some(task.clone());
                                 }
+
+                                if response.secondary_clicked() {
+                                    if matches!(task.status, TaskStatus::Archived) {
+                                        pending_deletion_id = Some(task.id);
+                                    } else {
+                                        let mut updated_task = task.clone();
+                                        updated_task.status = TaskStatus::Archived;
+                                        pending_update_task = Some(updated_task);
+                                    }
+                                }
+
+
 
                                 if response.dragged() {
                                     ui.ctx().set_cursor_icon(CursorIcon::Grabbing);
@@ -445,24 +464,25 @@ impl Tako {
                                     if delta != Vec2::ZERO {
                                         let mut task = task.clone();
                                         task.delta_update(&delta, &area_rect, &task_stats);
-                                        pending_update_task.push(Box::new(task));
+                                        pending_update_task = Some(task);
                                     }
                                 }
                             }
                             self.show_arrange_labels(ui, &area_rect);
 
-                            if !pending_update_task.is_empty() { 
+                            if let Some(task) = pending_update_task { 
+                                let task = Box::new(task);
                                 match &mut self.arrange_nested_tasks.last_mut() {
-                                    Some(parent) => {
-                                        pending_update_task.into_iter().for_each(|task| {
-                                            parent.add_subtask(task);
-                                        });
-                                    },
-                                    None => {
-                                        pending_update_task.into_iter().for_each(|task| {
-                                            self.oswald.add_task(task);
-                                        });
-                                    }
+                                    Some(parent) => parent.add_subtask(task),
+                                    None => self.oswald.add_task(task)
+                                }
+                                self.save_arrange();
+                            }
+
+                            if let Some(task_id) = pending_deletion_id {
+                                match &mut self.arrange_nested_tasks.last_mut() {
+                                    Some(parent) => parent.delete_subtask(task_id),
+                                    None => self.oswald.delete_task(task_id)
                                 }
                                 self.save_arrange();
                             }
