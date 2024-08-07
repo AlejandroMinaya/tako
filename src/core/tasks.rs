@@ -37,6 +37,7 @@ impl Into<TaskStatus> for i32 {
         }
     }
 }
+const MAX_DISTANCE: f32 = f32::MAX/2.0;
 
 /* TASK ==================================================================== */
 #[derive(Default, Clone, Serialize, Deserialize)]
@@ -270,7 +271,12 @@ mod task_tests {
             ..Default::default()
         };
 
-        assert_eq!(task.get_distance(), 5.0);
+        let max_comp = MAX_DISTANCE/f32::sqrt(2.0);
+        let expected_distance = (
+            (max_comp - 4.0).powf(2.0) + (max_comp - 3.0).powf(2.0)
+        ).sqrt();
+
+        assert_eq!(task.get_distance(), expected_distance);
     }
 
     #[test]
@@ -315,6 +321,27 @@ mod task_tests {
     }
 
     #[test]
+    fn test_negative_component_arrange_sort() {
+        let mut root = Task::default();
+
+        let mut subtask_a = Box::new(Task::new_with_id(1));
+        subtask_a.importance = -4.0;
+        subtask_a.urgency = -4.0;
+
+        let mut subtask_b = Box::new(Task::new_with_id(2));
+        subtask_b.importance = 2.0;
+        subtask_b.urgency = 2.0;
+
+        root.add_subtask(subtask_a);
+        root.add_subtask(subtask_b);
+
+        let mut task_itr = root.get_subtasks().into_iter();
+        assert_eq!(task_itr.next().expect("Expected Task B").id, 2);
+        assert_eq!(task_itr.next().expect("Expected Task A").id, 1);
+        assert_eq!(task_itr.next(), None);
+    }
+
+    #[test]
     fn test_same_importance_different_complexity_sort() {
         let mut root = Task::default();
         let mut task_b = Box::new(Task::new_with_id(2));
@@ -334,7 +361,7 @@ mod task_tests {
         assert_eq!(task_itr.next().expect("Expected Task A").id, 1);
         assert_eq!(task_itr.next().expect("Expected Task C").id, 3);
         assert_eq!(task_itr.next().expect("Expected Task B").id, 2);
-        assert_eq!(None, task_itr.next());
+        assert_eq!(task_itr.next(), None);
     }
 
     #[test]
