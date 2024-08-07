@@ -37,8 +37,6 @@ impl Into<TaskStatus> for i32 {
         }
     }
 }
-const MAX_DISTANCE: f32 = f32::MAX/2.0;
-
 /* TASK ==================================================================== */
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Task {
@@ -67,14 +65,14 @@ impl Task {
         }
     }
     fn get_distance(&self) -> f32 {
-        let importance_comp = self.importance.powf(2.0);
-        let urgency_comp = self.urgency.powf(2.0);
-        let result = (importance_comp + urgency_comp).sqrt();
-        return if result != f32::INFINITY {
-            result
-        } else {
-            f32::MAX
-        };
+        let importance = self.importance * self.importance.abs();
+        let urgency = self.urgency * self.urgency.abs();
+
+        let result = (importance + urgency).clamp(f32::MIN, f32::MAX);
+
+        dbg!(self, result);
+
+        return result;
     }
 
     pub fn get_complexity(&self) -> u32 {
@@ -271,12 +269,7 @@ mod task_tests {
             ..Default::default()
         };
 
-        let max_comp = MAX_DISTANCE/f32::sqrt(2.0);
-        let expected_distance = (
-            (max_comp - 4.0).powf(2.0) + (max_comp - 3.0).powf(2.0)
-        ).sqrt();
-
-        assert_eq!(task.get_distance(), expected_distance);
+        assert_eq!(task.get_distance(), 25.0);
     }
 
     #[test]
