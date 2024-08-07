@@ -300,13 +300,13 @@ impl Tako {
         Frame::default()
             .inner_margin(INNER_MARGIN)
             .show(ui, |ui| {
-                let mut curr_column = self.overview_columns - 1;
+                let mut curr_column = 0;
                 let enumerated_tasks = self.oswald.get_all_tasks().into_iter().enumerate();
                 ScrollArea::vertical().show(ui, |ui| {
                     ui.columns(self.overview_columns, |columns| {
                         for (idx, task) in enumerated_tasks {
-                            if idx > 0 && idx % self.target_daily_tasks == 0 && curr_column >= 1 { curr_column -= 1; }
-                            if let Some(column) = columns.get_mut(curr_column) {
+                            if idx > 0 && idx % self.target_daily_tasks == 0 && curr_column < self.overview_columns { curr_column += 1; }
+                            if let Some(column) = columns.get_mut(self.overview_columns - curr_column - 1) {
                                 task.show_overview(column);
                             }
                         }
