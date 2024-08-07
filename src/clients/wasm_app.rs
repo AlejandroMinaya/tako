@@ -67,7 +67,10 @@ const ARCHIVED_TASK_BG: Color32 = Color32::from_rgb(10, 61, 98);
 const ARCHIVED_TASK_HOVERED_BG: Color32 = Color32::from_rgb(60, 99, 130);
 const ARCHIVED_TASK_FG: Color32 = Color32::from_rgb(223, 249, 251);
 
-const MIN_DRAG_DELTA: f32 = 1e-12;
+const MIN_DRAG_DELTA: f32 = 1e-2;
+const MAX_ARRANGE_RECT: f32 = 100.0;
+const MIN_ARRANGE_RECT: f32 = -100.0;
+const RANGE_ARRANGE_RECT: f32 = MAX_ARRANGE_RECT - MIN_ARRANGE_RECT;
 
 fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
     if max_val == min_val {
@@ -83,16 +86,16 @@ fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
 
 impl Task { 
     fn delta_update(&mut self, delta: &Vec2, area: &Rect, stats: &Stats) {
-        let mut urgency_delta = delta.x / area.width() * stats.range_urgency.max(f32::MIN_POSITIVE);
-        let mut importance_delta = -delta.y / area.height() * stats.range_importance.max(f32::MIN_POSITIVE);
+        let mut urgency_delta = delta.x / area.width() * RANGE_ARRANGE_RECT;
+        let mut importance_delta = -delta.y / area.height() * RANGE_ARRANGE_RECT;
         urgency_delta = urgency_delta.signum() * urgency_delta.abs().max(MIN_DRAG_DELTA);
         importance_delta = importance_delta.signum() * importance_delta.abs().max(MIN_DRAG_DELTA);
         self.urgency += urgency_delta;
         self.importance += importance_delta;
     }
     fn get_arrange_rect(&self, stats: &Stats, area: &Rect) -> Rect {
-        let norm_importance =  norm_value(self.importance, stats.min_importance, stats.max_importance);
-        let norm_urgency =  norm_value(self.urgency, stats.min_urgency, stats.max_urgency);
+        let norm_importance =  norm_value(self.importance, MIN_ARRANGE_RECT, MAX_ARRANGE_RECT);
+        let norm_urgency =  norm_value(self.urgency, MIN_ARRANGE_RECT, MAX_ARRANGE_RECT);
 
         let half_task_width = TASK_SIZE.x/2.0;
         let half_task_height = TASK_SIZE.y/2.0;
