@@ -24,8 +24,8 @@ This will be different for everybody in the same way that importance and urgency
 - ✅ Get top-level subtasks
 - ✅ Get all subtasks
 - ✅ Get subtask parent
-- ⬛ Delete task
-- ⬛ Delete subtask
+- ✅ Delete task
+- ✅ Delete subtask
 #### Oswald (manager)
 - ✅ Add/update task
 - ✅ Get top-level subtasks

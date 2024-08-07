@@ -32,7 +32,7 @@ use eframe::{
     Storage,
     run_native
 };
-use crate::core::tasks::{Oswald, Task, BoxTaskVec, TaskStatus};
+use crate::core::tasks::{Oswald, Task, TaskStatus};
 
 const AUTO_SAVE_INTERVAL: Duration = Duration::new(5, 0);
 
@@ -203,46 +203,19 @@ enum View {
 }
 
 #[derive(Debug)]
-struct Stats {
-    max_urgency: f32,
-    min_urgency: f32,
-    range_urgency: f32,
-    max_importance: f32,
-    min_importance: f32,
-    range_importance: f32
-}
-impl Stats {
-    fn from_tasks(tasks: &Vec<&Task>) -> Stats {
-        let mut stats = Stats {
-            max_importance: 0.0,
-            min_importance: f32::MAX,
-            range_importance: 0.0,
-            max_urgency: 0.0,
-            min_urgency: f32::MAX,
-            range_urgency: 0.0,
-        };
+#[derive(Default)]
+struct Settings {
+    overview_columns: Vec<String>,
+    target_daily_tasks: usize
 
-        for task in tasks {
-            stats.max_importance = f32::max(stats.max_importance, task.importance);
-            stats.min_importance = f32::min(stats.min_importance, task.importance);
-            stats.max_urgency = f32::max(stats.max_urgency, task.urgency);
-            stats.min_urgency = f32::min(stats.min_urgency, task.urgency);
-        }
-        stats.range_urgency = stats.max_urgency - stats.min_urgency;
-        stats.range_importance = stats.max_importance - stats.min_importance;
-
-        stats
-    }
 }
 struct Tako {
     oswald: Oswald,
     current_view: View,
-    target_daily_tasks: usize,
-    overview_columns: usize,
     form_task: Option<Task>,
     arrange_nested_tasks: Vec<Task>,
-    clear_all_dialog: bool,
-    next_task_id: u32
+    next_task_id: u32,
+    settings: Settings
 }
 impl Tako {
     fn tako_full_button(&self, ui: &mut Ui, text: &str, selected: bool) -> Response {
@@ -327,22 +300,8 @@ impl Tako {
                     if self.tako_full_button(ui, "Arrange (Tree)", matches!(self.current_view, View::Arrange)).clicked() {
                         self.current_view = View::Arrange;
                     }
-                    if self.tako_full_button(ui, "Clear All", false).clicked() {
-                        self.clear_all_dialog = true;
-                    }
                 });
             });
-            Window::new("Are you sure?")
-                .open(&mut self.clear_all_dialog)
-                .show(ctx, |ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.label("This will DELETE all your tasks, are you sure?");
-                        if ui.button("Yes, I understand").clicked() {
-                            self.oswald.clear();
-                        }
-                    });
-                });
-
     }
 
     fn show_overview_frame(&mut self, ui: &mut Ui, ctx: &Context) {
@@ -353,10 +312,19 @@ impl Tako {
                 let mut pending_update_task: Option<Task> = None;
                 let mut pending_deletion_id: Option<u32> = None;
                 ScrollArea::vertical().show(ui, |ui| {
-                    ui.columns(self.overview_columns, |columns| {
+                    let num_columns = 1 + self.settings.overview_columns.len();
+                    assert!(num_columns != 0, "There should be at least a column");
+                    ui.columns(num_columns, |columns| {
+                        let default_column = &mut columns[0];
+                        default_column.label("Backlog");
+
+                        let named_columns = &mut columns[1..];
+                        named_columns.iter_mut().enumerate()
+                            .for_each(|(idx, col)| {col.label(&self.settings.overview_columns[idx]);});
+
                         for (idx, task) in enumerated_tasks {
-                            if idx > 0 && idx % self.target_daily_tasks == 0 && curr_column < self.overview_columns - 1 { curr_column += 1; }
-                            if let Some(column) = columns.get_mut(self.overview_columns - curr_column - 1) {
+                            if idx > 0 && idx % self.settings.target_daily_tasks == 0 && curr_column < num_columns - 1 { curr_column += 1; }
+                            if let Some(column) = columns.get_mut(num_columns - curr_column - 1) {
                                 let response = task.show_overview(column);
                                 if response.hovered() {
                                     ctx.set_cursor_icon(CursorIcon::PointingHand)
@@ -647,9 +615,13 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
             form_task: None,
             arrange_nested_tasks: vec![],
             current_view: View::Overview,
-            target_daily_tasks: 5,
-            overview_columns: 3,
-            clear_all_dialog: false,
+            settings: Settings {
+                target_daily_tasks: 5,
+                overview_columns: vec![
+                    "Tomorrow".to_owned(),
+                    "Today".to_owned(),
+                ],
+            },
         }))
     }))
 }
