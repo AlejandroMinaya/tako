@@ -70,8 +70,6 @@ impl Task {
 
         let result = (importance + urgency).clamp(f32::MIN, f32::MAX);
 
-        dbg!(self, result);
-
         return result;
     }
 

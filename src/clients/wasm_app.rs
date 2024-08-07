@@ -409,7 +409,7 @@ impl Tako {
 
                                 if response.dragged() {
                                     ui.ctx().set_cursor_icon(CursorIcon::Grabbing);
-                                    let delta = response.drag_motion();
+                                    let delta = response.drag_delta();
                                     if delta != Vec2::ZERO {
                                         let mut task = task.clone();
                                         task.delta_update(&delta, &area_rect, &task_stats);
