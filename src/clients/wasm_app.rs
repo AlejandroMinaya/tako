@@ -52,7 +52,7 @@ const TASK_PADDING: f32 = 16.0;
 const TASK_RADIUS: f32 = 8.0;
 const TASK_SIZE: Vec2 = Vec2 { x: 120.0, y: 80.0 };
 
-const DRAG_SPEED: f32 = 15.0;
+const DRAG_SPEED: f32 = 12.0;
 
 fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
     if max_val == min_val {
@@ -361,7 +361,6 @@ impl Tako {
                                     new_parent_task = Some(task.clone());
                                 }
 
-
                                 if response.dragged() {
                                     let delta = response.drag_motion();
                                     if delta != Vec2::ZERO {
@@ -430,7 +429,18 @@ impl Tako {
                     Some(mut parent_task) => {
                         parent_task.add_subtask(task);
                         self.arrange_parent_task = Some(parent_task.clone());
-                        self.oswald.add_task(Box::new(parent_task));
+
+                        let boxed_task = Box::new(parent_task);
+                        match self.arrange_prev_parents.pop().take() {
+                            Some(mut grand_parent) => {
+                                grand_parent.add_subtask(boxed_task);
+                                self.arrange_prev_parents.push(grand_parent.clone());
+                                self.oswald.add_task(Box::new(grand_parent));
+                            },
+                            None => {
+                                self.oswald.add_task(boxed_task);
+                            }
+                        }
                     },
                     None => {
                         self.oswald.add_task(task);
