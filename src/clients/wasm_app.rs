@@ -1,5 +1,7 @@
 use std::cmp::max;
 use egui::{
+    Layout,
+    Direction,
     Window,
     Button,
     Context,
@@ -47,7 +49,6 @@ const TASK_BG: Color32 = Color32::from_rgb(109, 33, 79);
 const TASK_HOVERED_BG: Color32 = Color32::from_rgb(179, 55, 113);
 const TASK_FG: Color32 = Color32::from_rgb(255, 204, 204);
 const TASK_FONT_SIZE: f32 = 12.0;
-const TASK_MARGIN: f32 = 2.0;
 const TASK_PADDING: f32 = 16.0;
 const TASK_RADIUS: f32 = 8.0;
 const TASK_SIZE: Vec2 = Vec2 { x: 120.0, y: 80.0 };
@@ -113,47 +114,21 @@ impl Task {
     }
     fn show_arrange(&self, ui: &mut Ui, stats: &Stats, area: &Rect) -> Response {
         let task_rect = self.get_arrange_rect(stats, area);
-        let _ = ui.allocate_rect(task_rect, Sense::click_and_drag());
-        let id = Id::new(format!("task_{}", self.id));
-        let response = ui.interact(task_rect, id, Sense::click_and_drag());
-        let mut background_color = 
-            if response.hovered() {
-                TASK_HOVERED_BG
-            } else {
-                TASK_BG
-            };
-        let complexity: f32 = self.get_complexity() as f32;
-        if complexity > 1.0 {
-            background_color = background_color.gamma_multiply(1.0/complexity
-            );
-        }
-        let content_rect = task_rect.shrink(TASK_PADDING);
-        let mut text_layout = LayoutJob::simple(
-            self.desc.clone(),
-            FontId { size: TASK_FONT_SIZE, family: FontFamily::Monospace },
-            TASK_FG,
-            content_rect.width()
-        );
-        text_layout.halign = Align::Center;
-        let mut text_pos = Align2::CENTER_CENTER.pos_in_rect(&content_rect);
-        text_pos.y -= TASK_FONT_SIZE/2.0;
-
-        let text_galley = ui.painter().layout_job(text_layout);
-        ui.painter().rect_filled(task_rect, TASK_RADIUS, background_color); 
-        ui.painter().galley(text_pos, text_galley, TASK_FG);
-
-        if response.hovered () {
-            ui.ctx().set_cursor_icon(CursorIcon::Grab);
-        }
-        if response.dragged() {
-            ui.ctx().set_cursor_icon(CursorIcon::Move);
-        }
-
-        response
+        let mut child_ui = ui.child_ui(task_rect, Layout::centered_and_justified(Direction::TopDown), None);
+        child_ui.add(self)
     }
 
     fn show_overview(&self, ui: &mut Ui) -> Response {
-        let (task_rect, response) = ui.allocate_at_least(TASK_SIZE, Sense::click());
+        let (task_rect, _) = ui.allocate_at_least(TASK_SIZE, Sense::click());
+        let mut child_ui = ui.child_ui(task_rect, Layout::centered_and_justified(Direction::TopDown), None);
+        child_ui.add(self)
+    }
+}
+
+impl egui::Widget for &Task {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let (id, rect) = ui.allocate_space(ui.available_size());
+        let response = ui.interact(rect, id, Sense::click_and_drag());
         let task_stat = (self.status, response.hovered);
         let mut background_color = match task_stat {
             (TaskStatus::Done, true) => DONE_TASK_HOVERED_BG,
@@ -165,29 +140,27 @@ impl Task {
             (TaskStatus::Done, _) => DONE_TASK_FG,
             _ => TASK_FG
         };
-        let complexity: f32 = self.get_complexity() as f32;
-        if complexity > 1.0 {
-            background_color = background_color.gamma_multiply(1.0/complexity
-            );
-        }
-        let content_rect = task_rect.shrink(TASK_PADDING);
-        let mut text_layout = LayoutJob::simple(
+        let complexity = self.get_complexity() as f32;
+        background_color = background_color.gamma_multiply(1.0/complexity);
+        let content_rect = rect.shrink(TASK_PADDING);
+
+        let text_galley = ui.painter().layout(
             self.desc.clone(),
             FontId { size: TASK_FONT_SIZE, family: FontFamily::Monospace },
             font_color,
             content_rect.width()
         );
-        text_layout.halign = Align::Center;
-        let mut text_pos = Align2::CENTER_CENTER.pos_in_rect(&content_rect);
-        text_pos.y -= TASK_FONT_SIZE/2.0;
 
-        Frame::default()
-            .outer_margin(TASK_MARGIN)
-            .show(ui, |ui| {
-                let text_galley = ui.painter().layout_job(text_layout);
-                ui.painter().rect_filled(task_rect, TASK_RADIUS, background_color); 
-                ui.painter().galley(text_pos, text_galley, font_color);
-            });
+        let y_offset = (content_rect.height() - text_galley.rect.height()) / 2.0;
+        ui.painter().rect_filled(rect, TASK_RADIUS, background_color);
+        ui.painter().galley(
+            Pos2::new(
+                content_rect.min.x,
+                content_rect.min.y + y_offset.max(0.0)
+            ), 
+            text_galley,
+            background_color
+        );
 
         response
     }
@@ -375,6 +348,10 @@ impl Tako {
                             for task in tasks {
                                 let response = task.show_arrange(ui, &task_stats, &area_rect);
 
+                                if response.hovered() {
+                                    ui.ctx().set_cursor_icon(CursorIcon::Grab);
+                                }
+
                                 if response.triple_clicked() {
                                     self.form_task = Some(task.clone());
                                 } else if response.double_clicked() {
@@ -382,6 +359,7 @@ impl Tako {
                                 }
 
                                 if response.dragged() {
+                                    ui.ctx().set_cursor_icon(CursorIcon::Grabbing);
                                     let delta = response.drag_motion();
                                     if delta != Vec2::ZERO {
                                         let mut task = task.clone();
