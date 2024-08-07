@@ -321,11 +321,11 @@ impl Tako {
                         self.save_arrange();
                         self.arrange_nested_tasks.clear();
                     }
-                    if self.tako_full_button(ui, "Arrange", matches!(self.current_view, View::Arrange)).clicked() {
-                        self.current_view = View::Arrange;
-                    }
                     if self.tako_full_button(ui, "Arrange (All)", matches!(self.current_view, View::ArrangeAll)).clicked() {
                         self.current_view = View::ArrangeAll;
+                    }
+                    if self.tako_full_button(ui, "Arrange (Tree)", matches!(self.current_view, View::Arrange)).clicked() {
+                        self.current_view = View::Arrange;
                     }
                     if self.tako_full_button(ui, "Clear All", false).clicked() {
                         self.clear_all_dialog = true;
@@ -514,7 +514,7 @@ impl Tako {
                         .default_size(ui.available_size())
                         .constrain_to(area_rect)
                         .show(ctx, |ui| {
-                            let tasks = self.oswald.get_all_tasks();
+                            let tasks: Vec<&Task> = self.oswald.get_all_tasks().into_iter().filter(|task| task.get_complexity() == 1).collect();
                             let mut pending_update_task: Option<Task> = None;
 
                             for task in tasks {
