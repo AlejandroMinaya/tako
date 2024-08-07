@@ -91,8 +91,14 @@ impl Task {
             None => { self._add_subtask(subtask); }
         }
     }
+    fn _delete_subtask(&mut self, id: u32) {
+        self.subtasks_map.remove(&id);
+    }
     pub fn delete_subtask(&mut self, id: u32) {
-        todo!();
+        match self.get_subtask_parent(id) {
+            Some(parent) => { parent._delete_subtask(id); },
+            None => { self._delete_subtask(id); }
+        }
     }
 
     pub fn add_subtasks_vec(&mut self, subtasks: BoxTaskVec) {
