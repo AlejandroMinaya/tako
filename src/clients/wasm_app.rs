@@ -22,8 +22,8 @@ use egui::{
     FontFamily,
     Rect,
     Area,
-    Id,
     CursorIcon,
+    Id,
     text::LayoutJob
 };
 use eframe::{
@@ -128,7 +128,8 @@ impl Task {
 
 impl egui::Widget for &Task {
     fn ui(self, ui: &mut Ui) -> Response {
-        let (id, rect) = ui.allocate_space(ui.available_size());
+        let (_, rect) = ui.allocate_space(ui.available_size());
+        let id = Id::new(format!("task_{}", self.id));
         let response = ui.interact(rect, id, Sense::click_and_drag());
         let task_stat = (self.status, response.hovered);
         let mut background_color = match task_stat {
@@ -145,33 +146,34 @@ impl egui::Widget for &Task {
         background_color = background_color.gamma_multiply(1.0/complexity as f32);
         let content_rect = rect.shrink(TASK_PADDING);
 
-
         ui.painter().rect_filled(rect, TASK_RADIUS, background_color);
 
-        let desc_galley = ui.painter().layout(
-            self.desc.clone(),
-            FontId { size: TASK_FONT_SIZE, family: FontFamily::Monospace },
-            font_color,
-            content_rect.width()
-        );
-        let y_desc_offset = (content_rect.height() - desc_galley.rect.height()) / 2.0;
-        let desc_pos = Pos2::new(content_rect.min.x, content_rect.min.y + y_desc_offset.max(0.0));
-        ui.painter().galley(desc_pos, desc_galley, background_color);
-
-
+        let mut content_width = content_rect.width();
         if complexity > 1 {
             let complexity_galley = ui.painter().layout_no_wrap(
                 format!("{}", complexity - 1),
                 FontId { size: TASK_SMALL_FONT_SIZE, family: FontFamily::Monospace },
                 font_color,
             );
+            content_width -= complexity_galley.rect.width();
+
             let complexity_anchor = Align2::RIGHT_CENTER.pos_in_rect(&content_rect);
             let complexity_pos = Pos2::new(
                 complexity_anchor.x - complexity_galley.rect.width()/2.0,
                 complexity_anchor.y - complexity_galley.rect.height()/2.0
             );
             ui.painter().galley(complexity_pos, complexity_galley, font_color);
+
         }
+        let desc_galley = ui.painter().layout(
+            self.desc.clone(),
+            FontId { size: TASK_FONT_SIZE, family: FontFamily::Monospace },
+            font_color,
+            content_width
+        );
+        let y_desc_offset = (content_rect.height() - desc_galley.rect.height()) / 2.0;
+        let desc_pos = Pos2::new(content_rect.min.x, content_rect.min.y + y_desc_offset.max(0.0));
+        ui.painter().galley(desc_pos, desc_galley, background_color);
 
         response
     }
@@ -180,6 +182,7 @@ impl egui::Widget for &Task {
 #[derive(Default)]
 enum View {
     Arrange,
+    ArrangeAll,
     #[default]
     Overview
 }
@@ -271,6 +274,9 @@ impl Tako {
                     if self.tako_full_button(ui, "Arrange", matches!(self.current_view, View::Arrange)).clicked() {
                         self.current_view = View::Arrange;
                     }
+                    if self.tako_full_button(ui, "Arrange (All)", matches!(self.current_view, View::Arrange)).clicked() {
+                        self.current_view = View::ArrangeAll;
+                    }
                     if self.tako_full_button(ui, "Clear All", false).clicked() {
                         self.clear_all_dialog = true;
                     }
@@ -291,7 +297,6 @@ impl Tako {
 
     fn show_overview_frame(&mut self, ui: &mut Ui) {
         Frame::default()
-            .inner_margin(INNER_MARGIN)
             .show(ui, |ui| {
                 let mut curr_column = 0;
                 let enumerated_tasks = self.oswald.get_all_tasks().into_iter().enumerate();
@@ -319,6 +324,7 @@ impl Tako {
                     .for_each(|task| self.oswald.add_task(Box::new(task)))
             });
     }
+
     fn show_arrange_frame(&mut self, ui: &mut Ui, ctx: &Context) {
         self.show_task_form(ctx);
         Frame::default()
@@ -403,6 +409,56 @@ impl Tako {
                 });
             });
     }
+
+    fn show_arrange_all_frame(&mut self, ui: &mut Ui, ctx: &Context) {
+        self.show_task_form(ctx);
+        Frame::default()
+            .show(ui, |ui| {
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        if ui.add_sized(Vec2::new(144.0, 16.0), Button::new("Add Task")).clicked() {
+                            self.form_task = Some(Task::new_with_id(self.next_task_id));
+                        }
+                    });
+                    ui.separator();
+                    let (_, area_rect) = ui.allocate_space(ui.available_size());
+                    Area::new("Arrange".into())
+                        .movable(true)
+                        .default_size(ui.available_size())
+                        .constrain_to(area_rect)
+                        .show(ctx, |ui| {
+                            let tasks = self.oswald.get_all_tasks();
+                            let mut pending_update_tasks: BoxTaskVec = vec![];
+                            let task_stats = Stats::from_tasks(&tasks);
+
+                            for task in tasks {
+                                let response = task.show_arrange(ui, &task_stats, &area_rect);
+
+                                if response.hovered() {
+                                    ui.ctx().set_cursor_icon(CursorIcon::Grab);
+                                }
+
+                                if response.triple_clicked() {
+                                    self.form_task = Some(task.clone());
+                                }
+
+                                if response.dragged() {
+                                    ui.ctx().set_cursor_icon(CursorIcon::Grabbing);
+                                    let delta = response.drag_motion();
+                                    if delta != Vec2::ZERO {
+                                        let mut task = task.clone();
+                                        task.delta_update(&delta, &area_rect);
+                                        pending_update_tasks.push(Box::new(task));
+                                    }
+                                }
+                            }
+
+                            pending_update_tasks.into_iter()
+                                .for_each(|task| self.oswald.add_task(task));
+                    });
+                });
+            });
+    }
     fn show_task_form(&mut self, ctx: &Context) {
         let mut pending_cancel = false;
         let mut pending_save = false;
@@ -473,7 +529,8 @@ impl eframe::App for Tako {
         CentralPanel::default().show(ctx, |ui| {
             match self.current_view {
                 View::Overview => self.show_overview_frame(ui),
-                View::Arrange => self.show_arrange_frame(ui, ctx)
+                View::Arrange => self.show_arrange_frame(ui, ctx),
+                View::ArrangeAll => self.show_arrange_all_frame(ui, ctx)
             }
         });
     }
