@@ -26,9 +26,9 @@ pub enum TaskStatus {
     Archived = 254,
     Done = 255,
 }
-impl Into<TaskStatus> for i32 {
-    fn into(self) -> TaskStatus {
-        match self {
+impl From<i32> for TaskStatus {
+    fn from(val: i32) -> Self {
+        match val {
             253 => TaskStatus::Blocked,
             254 => TaskStatus::Archived,
             255 => TaskStatus::Done,
@@ -68,9 +68,9 @@ impl Task {
         let importance = self.importance * self.importance.abs();
         let urgency = self.urgency * self.urgency.abs();
 
-        let result = (importance + urgency).clamp(f32::MIN, f32::MAX);
+        
 
-        return result;
+        (importance + urgency).clamp(f32::MIN, f32::MAX)
     }
 
     pub fn get_complexity(&self) -> u32 {
@@ -79,7 +79,7 @@ impl Task {
         };
 
         let sub_itr = self.subtasks_map.values();
-        return sub_itr.fold(1_u32, |result, subtask| result + subtask.get_complexity());
+        sub_itr.fold(1_u32, |result, subtask| result + subtask.get_complexity())
     }
 
     fn _add_subtask(&mut self, subtask: Box<Self>) {
@@ -115,7 +115,7 @@ impl Task {
             .map(|boxed_task| boxed_task.as_ref())
             .collect();
         collected_subtasks.sort();
-        return collected_subtasks;
+        collected_subtasks
     }
     pub fn get_all_subtasks(&self) -> Vec<&Self> {
         let mut all_subtasks: Vec<&Self> = vec![];
@@ -127,10 +127,10 @@ impl Task {
             all_subtasks.append(&mut microtasks);
         });
         self.subtasks_map.values().for_each(|subtask| {
-            all_subtasks.push(&subtask);
+            all_subtasks.push(subtask);
         });
         all_subtasks.sort();
-        return all_subtasks
+        all_subtasks
     }
 
     fn get_subtask_parent(&mut self, id: u32) -> Option<&mut Task> {
@@ -145,7 +145,7 @@ impl Task {
             }
         }
         // Not found
-        return None
+        None
     }
 }
 impl PartialEq for Task {
@@ -183,12 +183,12 @@ impl Ord for Task {
         }
 
         // Compare IDs
-        return self.id.cmp(&other.id);
+        self.id.cmp(&other.id)
     }
 }
 impl PartialOrd for Task {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 impl std::fmt::Debug for Task {
@@ -819,7 +819,7 @@ mod oswald_tests {
 
     #[sqlx::test]
     async fn test_load_all_tasks_from_data_store() {
-        let mut oswald = Oswald::new(MockDataStore::default());
+        let mut oswald = Oswald::new(MockDataStore);
 
         let _ = oswald.load().await;
 
@@ -852,7 +852,7 @@ mod oswald_tests {
 
     #[test]
     fn test_add_task() {
-        let mut oswald = Oswald::new(MockDataStore::default());
+        let mut oswald = Oswald::new(MockDataStore);
         let task = Box::new(Task::new_with_id(1));
 
         oswald.add_task(task);
@@ -871,7 +871,7 @@ mod oswald_tests {
          *                 |
          *                (sE)
          */
-        let mut oswald = Oswald::new(MockDataStore::default());
+        let mut oswald = Oswald::new(MockDataStore);
         // Level 1
         let subtask_a = Box::new(Task::new_with_id(1));
         let mut subtask_b = Box::new(Task::new_with_id(2));
@@ -900,7 +900,7 @@ mod oswald_tests {
 
     #[test]
     fn test_clear() {
-        let mut oswald = Oswald::new(MockDataStore::default());
+        let mut oswald = Oswald::new(MockDataStore);
         let task = Box::new(Task::new_with_id(1));
 
         oswald.add_task(task);
@@ -913,7 +913,7 @@ mod oswald_tests {
 
     #[sqlx::test]
     async fn test_get_loaded_tasks() {
-        let mut oswald = Oswald::new(MockDataStore::default());
+        let mut oswald = Oswald::new(MockDataStore);
 
         assert!(oswald.load().await.is_ok(), "Expected MockDataStore to load");
 
@@ -929,7 +929,7 @@ mod oswald_tests {
     }
     #[sqlx::test]
     async fn test_get_top_loaded_tasks() {
-        let mut oswald = Oswald::new(MockDataStore::default());
+        let mut oswald = Oswald::new(MockDataStore);
 
         assert!(oswald.load().await.is_ok(), "Expected MockDataStore to load");
 
@@ -947,7 +947,7 @@ mod oswald_tests {
     // Right now it is only making sure that the .write() is being called
     #[sqlx::test]
     async fn test_save_loaded_tasks() {
-        let oswald = Oswald::new(MockDataStore::default());
+        let oswald = Oswald::new(MockDataStore);
 
         assert!(oswald.save().await.is_ok(), "Expected MockDataStore to save");
     }

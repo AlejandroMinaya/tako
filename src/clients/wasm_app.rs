@@ -88,7 +88,7 @@ fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
         max_val += min_val.abs();
         min_val = 0.0;
     }
-    return (curr - min_val) / (max_val - min_val);
+    (curr - min_val) / (max_val - min_val)
 }
 
 impl Task { 
@@ -268,17 +268,17 @@ impl Tako {
         let west_label = ui.painter().layout_no_wrap("(-) urgency".to_owned(), ARRANGE_LABEL_FONT, ARRANGE_FG);
         let east_label = ui.painter().layout_no_wrap("(+) urgency".to_owned(), ARRANGE_LABEL_FONT, ARRANGE_FG);
 
-        let mut north_anchor = Align2::CENTER_TOP.pos_in_rect(&rect);
+        let mut north_anchor = Align2::CENTER_TOP.pos_in_rect(rect);
         north_anchor.x -= north_label.rect.width()/2.0;
 
-        let mut south_anchor = Align2::CENTER_BOTTOM.pos_in_rect(&rect);
+        let mut south_anchor = Align2::CENTER_BOTTOM.pos_in_rect(rect);
         south_anchor.x -= south_label.rect.width()/2.0;
         south_anchor.y -= south_label.rect.height();
 
-        let mut west_anchor = Align2::LEFT_CENTER.pos_in_rect(&rect);
+        let mut west_anchor = Align2::LEFT_CENTER.pos_in_rect(rect);
         west_anchor.y -= west_label.rect.height()/2.0;
 
-        let mut east_anchor = Align2::RIGHT_CENTER.pos_in_rect(&rect);
+        let mut east_anchor = Align2::RIGHT_CENTER.pos_in_rect(rect);
         east_anchor.x -= east_label.rect.width();
         east_anchor.y -= east_label.rect.height()/2.0;
 

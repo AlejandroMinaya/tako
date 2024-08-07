@@ -63,7 +63,7 @@ impl SQLiteStore {
             .fetch_all(pool)
             .await?
             .into_iter()
-            .map(|raw_task| Box::new(raw_task))
+            .map(Box::new)
             .collect();
         Ok(orphans)
     }
