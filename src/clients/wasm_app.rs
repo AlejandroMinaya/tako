@@ -1,6 +1,6 @@
 use std::cmp::max;
+use std::time::Duration;
 use egui::{
-    Shape,
     Layout,
     Direction,
     Window,
@@ -34,6 +34,8 @@ use eframe::{
 };
 use crate::core::tasks::{Oswald, Task, BoxTaskVec, TaskStatus};
 
+const AUTO_SAVE_INTERVAL: Duration = Duration::new(5, 0);
+
 const MENU_WIDTH: f32 = 144.0;
 
 const BUTTON_SELECTED_BG: Color32 = Color32::from_rgb(119, 140, 163);
@@ -61,8 +63,6 @@ const DONE_TASK_BG: Color32 = Color32::from_rgb(106, 176, 76);
 const DONE_TASK_HOVERED_BG: Color32 = Color32::from_rgb(163, 203, 56);
 const DONE_TASK_FG: Color32 = Color32::WHITE;
 
-const DRAG_SPEED: f32 = 12.0;
-
 fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
     if max_val == min_val {
         return 0.0;
@@ -76,9 +76,9 @@ fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
 }
 
 impl Task { 
-    fn delta_update(&mut self, delta: &Vec2, area: &Rect) {
-        let urgency_delta = delta.x / area.width() * DRAG_SPEED;
-        let importance_delta = -delta.y / area.height() * DRAG_SPEED;
+    fn delta_update(&mut self, delta: &Vec2, area: &Rect, stats: &Stats) {
+        let urgency_delta = delta.x / area.width() * stats.max_urgency;
+        let importance_delta = -delta.y / area.height() * stats.max_importance;
         self.urgency += urgency_delta;
         self.importance += importance_delta;
     }
@@ -412,7 +412,7 @@ impl Tako {
                                     let delta = response.drag_motion();
                                     if delta != Vec2::ZERO {
                                         let mut task = task.clone();
-                                        task.delta_update(&delta, &area_rect);
+                                        task.delta_update(&delta, &area_rect, &task_stats);
                                         pending_update_tasks.push(Box::new(task));
                                     }
                                 }
@@ -480,7 +480,7 @@ impl Tako {
                                     let delta = response.drag_motion();
                                     if delta != Vec2::ZERO {
                                         let mut task = task.clone();
-                                        task.delta_update(&delta, &area_rect);
+                                        task.delta_update(&delta, &area_rect, &task_stats);
                                         pending_update_tasks.push(Box::new(task));
                                     }
                                 }
@@ -557,6 +557,7 @@ impl eframe::App for Tako {
             Err(err) => { println!("Couldn't save tasks: {err}") }
         }
     }
+    fn auto_save_interval(&self) -> Duration { AUTO_SAVE_INTERVAL }
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) { 
         self.show_menu(ctx);
 
