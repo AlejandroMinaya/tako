@@ -37,6 +37,7 @@ use crate::core::tasks::{Oswald, Task, TaskStatus};
 
 const AUTO_SAVE_INTERVAL: Duration = Duration::new(5, 0);
 
+const DEFAULT_MARGIN: f32 = 8.0;
 const MENU_WIDTH: f32 = 144.0;
 const MENU_BOTTOM_SECTION: f32 = 200.0;
 const MENU_PADDING: Vec2 = Vec2 { x: 0.0, y: 8.0 };
@@ -606,17 +607,41 @@ impl eframe::App for Tako {
         });
 
         let mut target_daily_tasks = self.settings.target_daily_tasks;
+        let mut overview_columns = self.settings.overview_columns.clone();
+        let mut column_to_remove: Option<usize> = None;
         Window::new("Settings")
+            .max_width(MENU_WIDTH)
             .open(&mut self.open_settings)
             .show(ctx, |ui| {
                 ui.vertical_centered(|ui| {
-                    ui.heading("Settings");
-                    ui.horizontal(|ui| {
-                        ui.label("# of tasks / day");
+                    ui.vertical(|ui| {
+                        ui.add_space(DEFAULT_MARGIN);
+                        ui.label("# of tasks / day:");
                         ui.add(Slider::new(&mut target_daily_tasks, 1..=MAX_TARGET_DAILY_TASKS))
                     });
+                    ui.vertical(|ui| {
+                        ui.add_space(DEFAULT_MARGIN);
+                        ui.label("Overview columns:");
+                        for (idx, column) in overview_columns.iter_mut().enumerate() {
+                            ui.horizontal(|ui| {
+                                if ui.button("Remove").clicked() {
+                                    column_to_remove = Some(idx);
+                                }
+                                ui.text_edit_singleline(column);
+                            });
+                        }
+                        if ui.button("Add column").clicked() {
+                            overview_columns.push("".to_owned());
+                        }
+                        ui.shrink_width_to_current();
+                    });
+                    ui.add_space(DEFAULT_MARGIN);
                 });
             });
+        if let Some(column_id) = column_to_remove {
+            overview_columns.remove(column_id);
+        }
+        self.settings.overview_columns = overview_columns;
         self.settings.target_daily_tasks = target_daily_tasks;
     }
 }
