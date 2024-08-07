@@ -1,6 +1,7 @@
 use std::cmp::max;
 use std::time::Duration;
 use egui::{
+    Slider,
     Layout,
     Direction,
     Window,
@@ -37,6 +38,8 @@ use crate::core::tasks::{Oswald, Task, TaskStatus};
 const AUTO_SAVE_INTERVAL: Duration = Duration::new(5, 0);
 
 const MENU_WIDTH: f32 = 144.0;
+const MENU_BOTTOM_SECTION: f32 = 200.0;
+const MENU_PADDING: Vec2 = Vec2 { x: 0.0, y: 8.0 };
 
 const BUTTON_SELECTED_BG: Color32 = Color32::from_rgb(119, 140, 163);
 const BUTTON_HOVERED_BG: Color32 = Color32::from_rgb(165, 177, 194);
@@ -71,6 +74,9 @@ const MIN_DRAG_DELTA: f32 = 1e-2;
 const MAX_ARRANGE_RECT: f32 = 100.0;
 const MIN_ARRANGE_RECT: f32 = -100.0;
 const RANGE_ARRANGE_RECT: f32 = MAX_ARRANGE_RECT - MIN_ARRANGE_RECT;
+
+
+const MAX_TARGET_DAILY_TASKS: usize = 24;
 
 fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
     if max_val == min_val {
@@ -215,6 +221,7 @@ struct Tako {
     form_task: Option<Task>,
     arrange_nested_tasks: Vec<Task>,
     next_task_id: u32,
+    open_settings: bool,
     settings: Settings
 }
 impl Tako {
@@ -288,7 +295,7 @@ impl Tako {
             .show(ctx, |ui| {
                 ui.vertical_centered(|ui| {
                     ui.heading("tako");
-                    ui.spacing();
+                    ui.add_space(MENU_PADDING.y);
                     if self.tako_full_button(ui, "Overview", matches!(self.current_view, View::Overview)).clicked() {
                         self.current_view = View::Overview;
                         self.save_arrange();
@@ -300,6 +307,13 @@ impl Tako {
                     if self.tako_full_button(ui, "Arrange (Tree)", matches!(self.current_view, View::Arrange)).clicked() {
                         self.current_view = View::Arrange;
                     }
+                    ui.add_space(ui.available_size().y - MENU_BOTTOM_SECTION - MENU_PADDING.y);
+                    ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
+                        ui.add_space(MENU_PADDING.y);
+                        if self.tako_full_button(ui, "Settings", matches!(self.current_view, View::Arrange)).clicked() {
+                            self.open_settings = true;
+                        }
+                    });
                 });
             });
     }
@@ -590,6 +604,20 @@ impl eframe::App for Tako {
                 View::ArrangeAll => self.show_arrange_all_frame(ui, ctx)
             }
         });
+
+        let mut target_daily_tasks = self.settings.target_daily_tasks;
+        Window::new("Settings")
+            .open(&mut self.open_settings)
+            .show(ctx, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.heading("Settings");
+                    ui.horizontal(|ui| {
+                        ui.label("# of tasks / day");
+                        ui.add(Slider::new(&mut target_daily_tasks, 1..=MAX_TARGET_DAILY_TASKS))
+                    });
+                });
+            });
+        self.settings.target_daily_tasks = target_daily_tasks;
     }
 }
 pub async fn start(mut oswald: Oswald) -> eframe::Result {
@@ -615,6 +643,7 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
             form_task: None,
             arrange_nested_tasks: vec![],
             current_view: View::Overview,
+            open_settings: false,
             settings: Settings {
                 target_daily_tasks: 5,
                 overview_columns: vec![
