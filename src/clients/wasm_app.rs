@@ -85,7 +85,7 @@ fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
 }
 
 impl Task { 
-    fn delta_update(&mut self, delta: &Vec2, area: &Rect, stats: &Stats) {
+    fn delta_update(&mut self, delta: &Vec2, area: &Rect) {
         let mut urgency_delta = delta.x / area.width() * RANGE_ARRANGE_RECT;
         let mut importance_delta = -delta.y / area.height() * RANGE_ARRANGE_RECT;
         urgency_delta = urgency_delta.signum() * urgency_delta.abs().max(MIN_DRAG_DELTA);
@@ -93,7 +93,7 @@ impl Task {
         self.urgency += urgency_delta;
         self.importance += importance_delta;
     }
-    fn get_arrange_rect(&self, stats: &Stats, area: &Rect) -> Rect {
+    fn get_arrange_rect(&self, area: &Rect) -> Rect {
         let norm_importance =  norm_value(self.importance, MIN_ARRANGE_RECT, MAX_ARRANGE_RECT);
         let norm_urgency =  norm_value(self.urgency, MIN_ARRANGE_RECT, MAX_ARRANGE_RECT);
 
@@ -127,8 +127,8 @@ impl Task {
         };
         Rect { min: top_left, max: bottom_right }
     }
-    fn show_arrange(&self, ui: &mut Ui, stats: &Stats, area: &Rect) -> Response {
-        let task_rect = self.get_arrange_rect(stats, area);
+    fn show_arrange(&self, ui: &mut Ui, area: &Rect) -> Response {
+        let task_rect = self.get_arrange_rect(area);
         let mut child_ui = ui.child_ui(task_rect, Layout::centered_and_justified(Direction::TopDown), None);
         child_ui.add(self)
     }
@@ -433,10 +433,9 @@ impl Tako {
                             let mut pending_update_task: Option<Task> = None;
                             let mut pending_deletion_id: Option<u32> = None;
                             let mut new_parent_task: Option<Task> = None;
-                            let task_stats = Stats::from_tasks(&tasks);
 
                             for task in tasks {
-                                let response = task.show_arrange(ui, &task_stats, &area_rect);
+                                let response = task.show_arrange(ui, &area_rect);
 
                                 if response.hovered() {
                                     ui.ctx().set_cursor_icon(CursorIcon::Grab);
@@ -466,7 +465,7 @@ impl Tako {
                                     let delta = response.drag_delta();
                                     if delta != Vec2::ZERO {
                                         let mut task = task.clone();
-                                        task.delta_update(&delta, &area_rect, &task_stats);
+                                        task.delta_update(&delta, &area_rect);
                                         pending_update_task = Some(task);
                                     }
                                 }
@@ -517,10 +516,9 @@ impl Tako {
                         .show(ctx, |ui| {
                             let tasks = self.oswald.get_all_tasks();
                             let mut pending_update_task: Option<Task> = None;
-                            let task_stats = Stats::from_tasks(&tasks);
 
                             for task in tasks {
-                                let response = task.show_arrange(ui, &task_stats, &area_rect);
+                                let response = task.show_arrange(ui, &area_rect);
 
                                 if response.hovered() {
                                     ui.ctx().set_cursor_icon(CursorIcon::Grab);
@@ -535,7 +533,7 @@ impl Tako {
                                     let delta = response.drag_motion();
                                     if delta != Vec2::ZERO {
                                         let mut task = task.clone();
-                                        task.delta_update(&delta, &area_rect, &task_stats);
+                                        task.delta_update(&delta, &area_rect);
                                         pending_update_task = Some(task);
                                     }
                                 }
