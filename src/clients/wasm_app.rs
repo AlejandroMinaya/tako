@@ -1,5 +1,6 @@
 use std::cmp::max;
 use egui::{
+    Shape,
     Layout,
     Direction,
     Window,
@@ -33,7 +34,6 @@ use eframe::{
 };
 use crate::core::tasks::{Oswald, Task, BoxTaskVec, TaskStatus};
 
-const INNER_MARGIN: f32 = 0.0;
 const MENU_WIDTH: f32 = 144.0;
 
 const BUTTON_SELECTED_BG: Color32 = Color32::from_rgb(119, 140, 163);
@@ -45,6 +45,9 @@ const BUTTON_MARGIN: f32 = 2.0;
 const BUTTON_PADDING: f32 = 8.0;
 const BUTTON_RADIUS: f32 = 16.0;
 
+const ARRANGE_LABEL_FONT: FontId = FontId { size: 12.0, family: FontFamily::Monospace };
+const ARRANGE_FG: Color32 = Color32::from_rgb(125, 125, 125);
+
 const TASK_BG: Color32 = Color32::from_rgb(109, 33, 79);
 const TASK_HOVERED_BG: Color32 = Color32::from_rgb(179, 55, 113);
 const TASK_FG: Color32 = Color32::from_rgb(255, 204, 204);
@@ -54,9 +57,9 @@ const TASK_PADDING: f32 = 16.0;
 const TASK_RADIUS: f32 = 8.0;
 const TASK_SIZE: Vec2 = Vec2 { x: 120.0, y: 80.0 };
 
-const DONE_TASK_BG: Color32 = Color32::from_rgb(163, 203, 56);
-const DONE_TASK_HOVERED_BG: Color32 = Color32::from_rgb(196, 229, 56);
-const DONE_TASK_FG: Color32 = Color32::from_rgb(241, 242, 246);
+const DONE_TASK_BG: Color32 = Color32::from_rgb(106, 176, 76);
+const DONE_TASK_HOVERED_BG: Color32 = Color32::from_rgb(163, 203, 56);
+const DONE_TASK_FG: Color32 = Color32::WHITE;
 
 const DRAG_SPEED: f32 = 12.0;
 
@@ -157,12 +160,10 @@ impl egui::Widget for &Task {
             );
             content_width -= complexity_galley.rect.width();
 
-            let complexity_anchor = Align2::RIGHT_CENTER.pos_in_rect(&content_rect);
-            let complexity_pos = Pos2::new(
-                complexity_anchor.x - complexity_galley.rect.width()/2.0,
-                complexity_anchor.y - complexity_galley.rect.height()/2.0
-            );
-            ui.painter().galley(complexity_pos, complexity_galley, font_color);
+            let mut complexity_anchor = Align2::RIGHT_CENTER.pos_in_rect(&content_rect);
+            complexity_anchor.x -= complexity_galley.rect.width()/2.0;
+            complexity_anchor.y -= complexity_galley.rect.height()/2.0;
+            ui.painter().galley(complexity_anchor, complexity_galley, font_color);
 
         }
         let desc_galley = ui.painter().layout(
@@ -260,6 +261,33 @@ impl Tako {
         response
     }
 
+    fn show_arrange_labels(&self, ui: &mut Ui, rect: &Rect) {
+        let north_label = ui.painter().layout_no_wrap("(+) important".to_owned(), ARRANGE_LABEL_FONT, ARRANGE_FG);
+        let south_label = ui.painter().layout_no_wrap("(-) important".to_owned(), ARRANGE_LABEL_FONT, ARRANGE_FG);
+        let west_label = ui.painter().layout_no_wrap("(-) urgency".to_owned(), ARRANGE_LABEL_FONT, ARRANGE_FG);
+        let east_label = ui.painter().layout_no_wrap("(+) urgency".to_owned(), ARRANGE_LABEL_FONT, ARRANGE_FG);
+
+        let mut north_anchor = Align2::CENTER_TOP.pos_in_rect(&rect);
+        north_anchor.x -= north_label.rect.width()/2.0;
+
+        let mut south_anchor = Align2::CENTER_BOTTOM.pos_in_rect(&rect);
+        south_anchor.x -= south_label.rect.width()/2.0;
+        south_anchor.y -= south_label.rect.height();
+
+        let mut west_anchor = Align2::LEFT_CENTER.pos_in_rect(&rect);
+        west_anchor.y -= west_label.rect.height()/2.0;
+
+        let mut east_anchor = Align2::RIGHT_CENTER.pos_in_rect(&rect);
+        east_anchor.x -= east_label.rect.width();
+        east_anchor.y -= east_label.rect.height()/2.0;
+
+        ui.painter().galley(north_anchor, north_label, ARRANGE_FG);
+        ui.painter().galley(south_anchor, south_label, ARRANGE_FG);
+        ui.painter().galley(west_anchor, west_label, ARRANGE_FG);
+        ui.painter().galley(east_anchor, east_label, ARRANGE_FG);
+
+    }
+
     fn show_menu(&mut self, ctx: &Context) {
         SidePanel::left("Options")
             .exact_width(MENU_WIDTH)
@@ -274,7 +302,7 @@ impl Tako {
                     if self.tako_full_button(ui, "Arrange", matches!(self.current_view, View::Arrange)).clicked() {
                         self.current_view = View::Arrange;
                     }
-                    if self.tako_full_button(ui, "Arrange (All)", matches!(self.current_view, View::Arrange)).clicked() {
+                    if self.tako_full_button(ui, "Arrange (All)", matches!(self.current_view, View::ArrangeAll)).clicked() {
                         self.current_view = View::ArrangeAll;
                     }
                     if self.tako_full_button(ui, "Clear All", false).clicked() {
@@ -295,7 +323,7 @@ impl Tako {
 
     }
 
-    fn show_overview_frame(&mut self, ui: &mut Ui) {
+    fn show_overview_frame(&mut self, ui: &mut Ui, ctx: &Context) {
         Frame::default()
             .show(ui, |ui| {
                 let mut curr_column = 0;
@@ -307,6 +335,10 @@ impl Tako {
                             if idx > 0 && idx % self.target_daily_tasks == 0 && curr_column < self.overview_columns { curr_column += 1; }
                             if let Some(column) = columns.get_mut(self.overview_columns - curr_column - 1) {
                                 let response = task.show_overview(column);
+                                if response.hovered() {
+                                    ctx.set_cursor_icon(CursorIcon::PointingHand)
+                                }
+
                                 if response.double_clicked () {
                                     let mut updated_task = task.clone();
                                     updated_task.status = match task.status {
@@ -385,6 +417,7 @@ impl Tako {
                                     }
                                 }
                             }
+                            self.show_arrange_labels(ui, &area_rect);
 
                             if !pending_update_tasks.is_empty() { 
                                 match &mut self.arrange_nested_tasks.last_mut() {
@@ -452,6 +485,7 @@ impl Tako {
                                     }
                                 }
                             }
+                            self.show_arrange_labels(ui, &area_rect);
 
                             pending_update_tasks.into_iter()
                                 .for_each(|task| self.oswald.add_task(task));
@@ -528,7 +562,7 @@ impl eframe::App for Tako {
 
         CentralPanel::default().show(ctx, |ui| {
             match self.current_view {
-                View::Overview => self.show_overview_frame(ui),
+                View::Overview => self.show_overview_frame(ui, ctx),
                 View::Arrange => self.show_arrange_frame(ui, ctx),
                 View::ArrangeAll => self.show_arrange_all_frame(ui, ctx)
             }
