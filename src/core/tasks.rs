@@ -817,7 +817,7 @@ mod oswald_tests {
     };
     use crate::ports::MockDataStore;
 
-    #[sqlx::test]
+    #[tokio::test]
     async fn test_load_all_tasks_from_data_store() {
         let mut oswald = Oswald::new(MockDataStore);
 
@@ -911,7 +911,7 @@ mod oswald_tests {
         assert!(oswald.root.subtasks_map.is_empty());
     }
 
-    #[sqlx::test]
+    #[tokio::test]
     async fn test_get_loaded_tasks() {
         let mut oswald = Oswald::new(MockDataStore);
 
@@ -927,7 +927,7 @@ mod oswald_tests {
         assert_eq!(itr.next().expect("Expected  Task #2").id, 2);
         assert_eq!(itr.next(), None);
     }
-    #[sqlx::test]
+    #[tokio::test]
     async fn test_get_top_loaded_tasks() {
         let mut oswald = Oswald::new(MockDataStore);
 
@@ -945,7 +945,7 @@ mod oswald_tests {
     // to be written to the mock data store.
     //
     // Right now it is only making sure that the .write() is being called
-    #[sqlx::test]
+    #[tokio::test]
     async fn test_save_loaded_tasks() {
         let oswald = Oswald::new(MockDataStore);
 
