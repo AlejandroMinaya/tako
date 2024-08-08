@@ -1,4 +1,5 @@
 use std::cmp::{max, min};
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 use egui::{
     Slider,
@@ -224,7 +225,7 @@ struct Tako {
     form_task: Option<Task>,
     next_task_id: u32,
     open_settings: bool,
-    overview_completed_tasks: Vec<Task>,
+    overview_completed_tasks: HashMap<u32, Task>,
     settings: Settings
 }
 impl Tako {
@@ -394,7 +395,7 @@ impl Tako {
                             }
                         }
 
-                        let completed_tasks = &mut self.overview_completed_tasks;
+                        let mut completed_tasks: Vec<&Task> = self.overview_completed_tasks.values().collect();
                         completed_tasks.sort();
                         for task in completed_tasks {
                             let response = task.show_overview(&mut columns[today_col_idx]);
@@ -624,6 +625,13 @@ impl eframe::App for Tako {
             },
             Err(err) => { println!("Couldn't save tasks: {err}") }
         }
+        let curr_completed_tasks_ids: Vec<&u32> = self.overview_completed_tasks.keys().collect();
+        match serde_json::to_string(&curr_completed_tasks_ids) {
+            Ok(tasks_ids) => { 
+                storage.set_string("current_completed_tasks", tasks_ids);
+            },
+            Err(err) => { println!("Couldn't save current completed tasks: {err}") }
+        };
     }
     fn auto_save_interval(&self) -> Duration { AUTO_SAVE_INTERVAL }
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) { 
@@ -680,11 +688,19 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
         ..Default::default()
     };
     run_native("Tako", options, Box::new(|cc| {
+        let mut overview_completed_tasks: HashMap<u32, Task> = HashMap::new();
         if let Some(storage) = cc.storage { 
-            let tasks_str = storage.get_string("tasks")
-                .unwrap_or("[]".to_owned());
+            let tasks_str = storage.get_string("tasks").unwrap_or("[]".to_owned());
             let raw_tasks: Vec<Task> = serde_json::from_str(&tasks_str)?;
-            for task in raw_tasks { oswald.add_task(Box::new(task)); }
+            let curr_completed_tasks_str = storage.get_string("current_completed_tasks").unwrap_or("[]".to_owned());
+            let curr_completed_tasks_ids: HashSet<u32> = serde_json::from_str(&curr_completed_tasks_str)?;
+            for task in raw_tasks { 
+                if curr_completed_tasks_ids.contains(&task.id) {
+                    overview_completed_tasks.insert(task.id, task.clone());
+                }
+                oswald.add_task(Box::new(task)); 
+            }
+
         }
         let mut next_task_id: u32 = 1;
 
@@ -699,7 +715,7 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
             form_task: None,
             next_task_id,
             open_settings: false,
-            overview_completed_tasks: vec![],
+            overview_completed_tasks,
             settings: Settings {
                 target_daily_tasks: 5,
                 backlog_column_label: "Backlog".to_owned(),
