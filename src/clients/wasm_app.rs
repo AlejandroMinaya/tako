@@ -1,4 +1,4 @@
-use std::cmp::max;
+use std::cmp::{max, min};
 use std::time::Duration;
 use egui::{
     Slider,
@@ -219,11 +219,12 @@ struct Settings {
 }
 struct Tako {
     oswald: Oswald,
+    arrange_nested_tasks: Vec<Task>,
     current_view: View,
     form_task: Option<Task>,
-    arrange_nested_tasks: Vec<Task>,
     next_task_id: u32,
     open_settings: bool,
+    overview_completed_tasks: Vec<Task>,
     settings: Settings
 }
 impl Tako {
@@ -320,58 +321,88 @@ impl Tako {
             });
     }
 
+    fn handle_overview_task_response(ctx: &Context, task: &Task, response: Response) -> (Option<Task>, Option<u32>) {
+        let mut pending_update: Option<Task> = None;
+        let mut pending_deletion: Option<u32> = None;
+
+        if response.hovered() {
+            ctx.set_cursor_icon(CursorIcon::PointingHand)
+        }
+
+        if response.double_clicked () {
+            if matches!(task.status, TaskStatus::Archived) {
+                pending_deletion = Some(task.id);
+            } else {
+                let mut updated_task = task.clone();
+                updated_task.status = match task.status {
+                    TaskStatus::Open => TaskStatus::Done,
+                    TaskStatus::Done => TaskStatus::Open,
+                    _ => TaskStatus::Archived
+                };
+                pending_update = Some(updated_task);
+            }
+        }
+
+        if response.secondary_clicked () {
+            let mut updated_task = task.clone();
+            updated_task.status = match task.status {
+                TaskStatus::Archived => TaskStatus::Open,
+                _ => TaskStatus::Archived
+            };
+            pending_update = Some(updated_task);
+        }
+
+        return (pending_update, pending_deletion);
+    }
+
     fn show_overview_frame(&mut self, ui: &mut Ui, ctx: &Context) {
         Frame::default()
             .show(ui, |ui| {
-                let mut curr_column = 0;
-                let enumerated_tasks = self.oswald.get_all_tasks().into_iter().enumerate();
+                let tasks = self.oswald.get_all_tasks();
                 let mut pending_update_task: Option<Task> = None;
                 let mut pending_deletion_id: Option<u32> = None;
                 ScrollArea::vertical().show(ui, |ui| {
                     let num_columns = 2 + self.settings.overview_columns.len();
                     assert!(num_columns >= 2, "There should be at least two columns");
+
                     ui.columns(num_columns, |columns| {
+                        let today_col_idx = num_columns - 1;
+
+                        // Naming the columns
                         let backlog_column = &mut columns[0];
                         backlog_column.label(&self.settings.backlog_column_label);
 
-                        let named_columns = &mut columns[1..num_columns-1];
+                        let named_columns = &mut columns[1..today_col_idx];
                         named_columns.iter_mut().enumerate()
                             .for_each(|(idx, col)| {col.label(&self.settings.overview_columns[idx]);});
 
-                        let today_column = &mut columns[num_columns-1];
+                        let today_column = &mut columns[today_col_idx];
                         today_column.label(&self.settings.today_column_label);
 
+                        // Painting the tasks
+                        let remaining_tasks = max(
+                            0, min(self.settings.target_daily_tasks, tasks.len()) - self.overview_completed_tasks.len(),
+                        );
+                        for task in &tasks[..remaining_tasks] {
+                            let response = task.show_overview(today_column);
+                            (pending_update_task, pending_deletion_id) = Tako::handle_overview_task_response(ctx, task, response);
+                        }
+
+                        let mut curr_column = today_col_idx - 1;
+                        let enumerated_tasks = tasks[remaining_tasks..].into_iter().enumerate();
                         for (idx, task) in enumerated_tasks {
-                            if idx > 0 && idx % self.settings.target_daily_tasks == 0 && curr_column < num_columns - 1 { curr_column += 1; }
-                            if let Some(column) = columns.get_mut(num_columns - curr_column - 1) {
+                            if idx > 0 && idx % self.settings.target_daily_tasks == 0 && curr_column > 0 { curr_column -= 1; }
+                            if let Some(column) = columns.get_mut(curr_column) {
                                 let response = task.show_overview(column);
-                                if response.hovered() {
-                                    ctx.set_cursor_icon(CursorIcon::PointingHand)
-                                }
-
-                                if response.double_clicked () {
-                                    if matches!(task.status, TaskStatus::Archived) {
-                                        pending_deletion_id = Some(task.id);
-                                    } else {
-                                        let mut updated_task = task.clone();
-                                        updated_task.status = match task.status {
-                                            TaskStatus::Open => TaskStatus::Done,
-                                            TaskStatus::Done => TaskStatus::Open,
-                                            _ => TaskStatus::Archived
-                                        };
-                                        pending_update_task = Some(updated_task);
-                                    }
-                                }
-
-                                if response.secondary_clicked () {
-                                    let mut updated_task = task.clone();
-                                    updated_task.status = match task.status {
-                                        TaskStatus::Archived => TaskStatus::Open,
-                                        _ => TaskStatus::Archived
-                                    };
-                                    pending_update_task = Some(updated_task);
-                                }
+                                (pending_update_task, pending_deletion_id) = Tako::handle_overview_task_response(ctx, task, response);
                             }
+                        }
+
+                        let completed_tasks = &mut self.overview_completed_tasks;
+                        completed_tasks.sort();
+                        for task in completed_tasks {
+                            let response = task.show_overview(&mut columns[today_col_idx]);
+                            (pending_update_task, pending_deletion_id) = Tako::handle_overview_task_response(ctx, task, response);
                         }
                     });
                 });
@@ -611,7 +642,6 @@ impl eframe::App for Tako {
         });
 
         let mut column_to_remove: Option<usize> = None;
-
         Window::new("Settings")
             .max_width(MENU_WIDTH)
             .open(&mut self.open_settings)
@@ -668,11 +698,12 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
         // Defaults
         Ok(Box::new(Tako {
             oswald, 
-            next_task_id,
-            form_task: None,
             arrange_nested_tasks: vec![],
             current_view: View::Overview,
+            form_task: None,
+            next_task_id,
             open_settings: false,
+            overview_completed_tasks: vec![],
             settings: Settings {
                 target_daily_tasks: 5,
                 backlog_column_label: "Backlog".to_owned(),
