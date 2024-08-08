@@ -14,6 +14,7 @@ anyhow = "1.0.86"
 async-recursion = "1.1.1"
 async-trait = "0.1.81"
 axum = { version = "0.7.5", features = ["macros"], optional = true }
+chrono = { version = "0.4.38", features = ["serde"] }
 eframe = { version = "0.28.1", features = ["persistence"] }
 egui = "0.28.1"
 futures = "0.3.30"

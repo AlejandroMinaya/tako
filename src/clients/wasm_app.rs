@@ -1,6 +1,7 @@
 use std::cmp::{max, min};
 use std::collections::HashSet;
 use std::time::Duration;
+use chrono::{NaiveDate, Local};
 use egui::{
     Slider,
     Layout,
@@ -226,15 +227,14 @@ struct Tako {
     next_task_id: u32,
     open_settings: bool,
     overview_completed_tasks: HashSet<u32>,
+    overview_completed_tasks_last_flush: Option<NaiveDate>,
     settings: Settings
 }
 impl Tako {
     fn tako_full_button(&self, ui: &mut Ui, text: &str, selected: bool) -> Response {
         let width = ui.available_width();
         let height = BUTTON_FONT_SIZE + BUTTON_PADDING;
-        let (rect, response) = ui.allocate_exact_size(
-            [width, height].into(), Sense::click()
-        );
+        let (rect, response) = ui.allocate_exact_size([width, height].into(), Sense::click());
         let background_color = 
             if selected {
                 BUTTON_SELECTED_BG
@@ -624,6 +624,7 @@ impl Tako {
             }
         }
     }
+
     fn save_arrange(&mut self) {
         let mut curr: Option<Task> = None;
         for task in self.arrange_nested_tasks.iter_mut().rev() {
@@ -636,6 +637,18 @@ impl Tako {
             self.oswald.add_task(Box::new(last_task));
         }
     }
+
+    fn auto_flush_overview_completed_tasks(&mut self) {
+        let today = Local::now().date_naive();
+        let update_date = match self.overview_completed_tasks_last_flush {
+            Some(old_flush_date) => (today - old_flush_date).num_days() > 0,
+            None => true
+        };
+        if update_date {
+            self.overview_completed_tasks.clear();
+            self.overview_completed_tasks_last_flush = Some(today);
+        }
+    }
 }
 impl eframe::App for Tako {
     fn save(&mut self, storage: &mut dyn Storage) {
@@ -646,6 +659,7 @@ impl eframe::App for Tako {
             },
             Err(err) => { println!("Couldn't save tasks: {err}") }
         }
+
         let curr_completed_tasks_ids: Vec<&u32> = self.overview_completed_tasks.iter().collect();
         match serde_json::to_string(&curr_completed_tasks_ids) {
             Ok(tasks_ids) => { 
@@ -653,9 +667,19 @@ impl eframe::App for Tako {
             },
             Err(err) => { println!("Couldn't save current completed tasks: {err}") }
         };
+
+        match serde_json::to_string(&self.overview_completed_tasks_last_flush) {
+            Ok(last_flush_date) => {
+                storage.set_string("completed_tasks_last_flush", last_flush_date);
+            },
+            Err(err) => { println!("Couldn't save the last flush date: {err}") }
+        }
     }
+
     fn auto_save_interval(&self) -> Duration { AUTO_SAVE_INTERVAL }
+
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) { 
+        self.auto_flush_overview_completed_tasks();
         self.show_menu(ctx);
 
         CentralPanel::default().show(ctx, |ui| {
@@ -710,18 +734,25 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
     };
     run_native("Tako", options, Box::new(|cc| {
         let mut overview_completed_tasks: HashSet<u32> = HashSet::new();
+        let mut overview_completed_tasks_last_flush: Option<NaiveDate> = None;
         if let Some(storage) = cc.storage { 
+            // Retrieve all tasks
             let tasks_str = storage.get_string("tasks").unwrap_or("[]".to_owned());
             let raw_tasks: Vec<Task> = serde_json::from_str(&tasks_str)?;
-            let curr_completed_tasks_str = storage.get_string("current_completed_tasks").unwrap_or("[]".to_owned());
-            let curr_completed_tasks_ids: HashSet<u32> = serde_json::from_str(&curr_completed_tasks_str)?;
             for task in raw_tasks { 
-                if matches!(task.status, TaskStatus::Done) && curr_completed_tasks_ids.contains(&task.id) {
-                    overview_completed_tasks.insert(task.id);
-                }
                 oswald.add_task(Box::new(task)); 
             }
 
+            // Retrieve completed tasks
+            let curr_completed_tasks_str = storage.get_string("current_completed_tasks").unwrap_or("[]".to_owned());
+            overview_completed_tasks = serde_json::from_str(&curr_completed_tasks_str)?;
+
+
+            // Retrieve last completed tasks flush date
+            let last_flush_date_str = storage.get_string("completed_tasks_last_flush");
+            if let Some(raw_date) = last_flush_date_str {
+                overview_completed_tasks_last_flush = serde_json::from_str(&raw_date)?;
+            }
         }
         let mut next_task_id: u32 = 1;
 
@@ -737,6 +768,7 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
             next_task_id,
             open_settings: false,
             overview_completed_tasks,
+            overview_completed_tasks_last_flush,
             settings: Settings {
                 target_daily_tasks: 5,
                 backlog_column_label: "Backlog".to_owned(),
