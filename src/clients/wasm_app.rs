@@ -212,9 +212,10 @@ enum View {
 #[derive(Debug)]
 #[derive(Default)]
 struct Settings {
+    backlog_column_label: String,
     overview_columns: Vec<String>,
+    today_column_label: String,
     target_daily_tasks: usize
-
 }
 struct Tako {
     oswald: Oswald,
@@ -331,14 +332,14 @@ impl Tako {
                     assert!(num_columns >= 2, "There should be at least two columns");
                     ui.columns(num_columns, |columns| {
                         let backlog_column = &mut columns[0];
-                        backlog_column.label("Backlog");
+                        backlog_column.label(&self.settings.backlog_column_label);
 
                         let named_columns = &mut columns[1..num_columns-1];
                         named_columns.iter_mut().enumerate()
                             .for_each(|(idx, col)| {col.label(&self.settings.overview_columns[idx]);});
 
                         let today_column = &mut columns[num_columns-1];
-                        today_column.label("Today");
+                        today_column.label(&self.settings.today_column_label);
 
                         for (idx, task) in enumerated_tasks {
                             if idx > 0 && idx % self.settings.target_daily_tasks == 0 && curr_column < num_columns - 1 { curr_column += 1; }
@@ -609,9 +610,8 @@ impl eframe::App for Tako {
             }
         });
 
-        let mut target_daily_tasks = self.settings.target_daily_tasks;
-        let mut overview_columns = self.settings.overview_columns.clone();
         let mut column_to_remove: Option<usize> = None;
+
         Window::new("Settings")
             .max_width(MENU_WIDTH)
             .open(&mut self.open_settings)
@@ -620,12 +620,13 @@ impl eframe::App for Tako {
                     ui.vertical(|ui| {
                         ui.add_space(DEFAULT_MARGIN);
                         ui.label("# of tasks / day:");
-                        ui.add(Slider::new(&mut target_daily_tasks, 1..=MAX_TARGET_DAILY_TASKS))
+                        ui.add(Slider::new(&mut self.settings.target_daily_tasks, 1..=MAX_TARGET_DAILY_TASKS))
                     });
                     ui.vertical(|ui| {
                         ui.add_space(DEFAULT_MARGIN);
                         ui.label("Overview columns:");
-                        for (idx, column) in overview_columns.iter_mut().enumerate() {
+                        ui.text_edit_singleline(&mut self.settings.backlog_column_label);
+                        for (idx, column) in self.settings.overview_columns.iter_mut().enumerate() {
                             ui.horizontal(|ui| {
                                 if ui.button("Remove").clicked() {
                                     column_to_remove = Some(idx);
@@ -633,8 +634,9 @@ impl eframe::App for Tako {
                                 ui.text_edit_singleline(column);
                             });
                         }
+                        ui.text_edit_singleline(&mut self.settings.today_column_label);
                         if ui.button("Add column").clicked() {
-                            overview_columns.push("".to_owned());
+                            self.settings.overview_columns.push("".to_owned());
                         }
                         ui.shrink_width_to_current();
                     });
@@ -642,10 +644,8 @@ impl eframe::App for Tako {
                 });
             });
         if let Some(column_id) = column_to_remove {
-            overview_columns.remove(column_id);
+            self.settings.overview_columns.remove(column_id);
         }
-        self.settings.overview_columns = overview_columns;
-        self.settings.target_daily_tasks = target_daily_tasks;
     }
 }
 pub async fn start(mut oswald: Oswald) -> eframe::Result {
@@ -665,6 +665,7 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
         for task in oswald.get_all_tasks() {
             next_task_id = max(next_task_id, task.id + 1);
         }
+        // Defaults
         Ok(Box::new(Tako {
             oswald, 
             next_task_id,
@@ -674,9 +675,11 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
             open_settings: false,
             settings: Settings {
                 target_daily_tasks: 5,
+                backlog_column_label: "Backlog".to_owned(),
                 overview_columns: vec![
                     "Tomorrow".to_owned(),
                 ],
+                today_column_label: "Today".to_owned()
             },
         }))
     }))
