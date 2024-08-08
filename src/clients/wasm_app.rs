@@ -1,5 +1,5 @@
 use std::cmp::{max, min};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::time::Duration;
 use egui::{
     Slider,
@@ -36,7 +36,7 @@ use eframe::{
 };
 use crate::core::tasks::{Oswald, Task, TaskStatus};
 
-const AUTO_SAVE_INTERVAL: Duration = Duration::new(5, 0);
+const AUTO_SAVE_INTERVAL: Duration = Duration::new(10, 0);
 
 const DEFAULT_MARGIN: f32 = 8.0;
 const MENU_WIDTH: f32 = 144.0;
@@ -225,7 +225,7 @@ struct Tako {
     form_task: Option<Task>,
     next_task_id: u32,
     open_settings: bool,
-    overview_completed_tasks: HashMap<u32, Task>,
+    overview_completed_tasks: HashSet<u32>,
     settings: Settings
 }
 impl Tako {
@@ -322,12 +322,19 @@ impl Tako {
             });
     }
 
-    fn handle_overview_task_response(ctx: &Context, task: &Task, response: Response, pending_update: &mut Option<Task>, pending_deletion: &mut Option<u32>) {
+    fn handle_overview_task_response(
+        ctx: &Context,
+        task: &Task,
+        response: Response,
+        completed_tasks: &mut HashSet<u32>,
+        pending_update: &mut Option<Task>,
+        pending_deletion: &mut Option<u32>
+    ) {
         if response.hovered() {
             ctx.set_cursor_icon(CursorIcon::PointingHand)
         }
 
-        if response.double_clicked () {
+        if response.double_clicked() {
             if matches!(task.status, TaskStatus::Archived) {
                 *pending_deletion = Some(task.id);
             } else {
@@ -337,6 +344,13 @@ impl Tako {
                     TaskStatus::Done => TaskStatus::Open,
                     _ => TaskStatus::Archived
                 };
+
+                if matches!(updated_task.status, TaskStatus::Done) {
+                    completed_tasks.insert(updated_task.id);
+                } else {
+                    completed_tasks.remove(&updated_task.id);
+                }
+
                 *pending_update = Some(updated_task);
             }
         }
@@ -350,12 +364,22 @@ impl Tako {
             *pending_update = Some(updated_task);
         }
 
+
     }
 
     fn show_overview_frame(&mut self, ui: &mut Ui, ctx: &Context) {
         Frame::default()
             .show(ui, |ui| {
-                let tasks = self.oswald.get_all_tasks();
+                let all_tasks = self.oswald.get_all_tasks();
+                let mut completed_tasks: Vec<&Task> = vec![];
+                let mut tasks: Vec<&Task> = vec![];
+                for task in all_tasks.into_iter() {
+                    if self.overview_completed_tasks.contains(&task.id) {
+                        completed_tasks.push(task);
+                    } else {
+                        tasks.push(task);
+                    }
+                }
                 let mut pending_update_task: Option<Task> = None;
                 let mut pending_deletion_id: Option<u32> = None;
                 ScrollArea::vertical().show(ui, |ui| {
@@ -377,12 +401,11 @@ impl Tako {
                         today_column.label(&self.settings.today_column_label);
 
                         // Painting the tasks
-                        let remaining_tasks = max(
-                            0, min(self.settings.target_daily_tasks, tasks.len()) - self.overview_completed_tasks.len(),
-                        );
+                        let target_tasks = min(self.settings.target_daily_tasks, tasks.len() + completed_tasks.len());
+                        let remaining_tasks = if target_tasks > completed_tasks.len() { target_tasks - completed_tasks.len() } else { 0 };
                         for task in &tasks[..remaining_tasks] {
                             let response = task.show_overview(today_column);
-                            Tako::handle_overview_task_response(ctx, task, response, &mut pending_update_task, &mut pending_deletion_id);
+                            Tako::handle_overview_task_response(ctx, task, response, &mut self.overview_completed_tasks, &mut pending_update_task, &mut pending_deletion_id);
                         }
 
                         let mut curr_column = today_col_idx - 1;
@@ -391,15 +414,13 @@ impl Tako {
                             if idx > 0 && idx % self.settings.target_daily_tasks == 0 && curr_column > 0 { curr_column -= 1; }
                             if let Some(column) = columns.get_mut(curr_column) {
                                 let response = task.show_overview(column);
-                                Tako::handle_overview_task_response(ctx, task, response, &mut pending_update_task, &mut pending_deletion_id);
+                                Tako::handle_overview_task_response(ctx, task, response, &mut self.overview_completed_tasks, &mut pending_update_task, &mut pending_deletion_id);
                             }
                         }
 
-                        let mut completed_tasks: Vec<&Task> = self.overview_completed_tasks.values().collect();
-                        completed_tasks.sort();
                         for task in completed_tasks {
                             let response = task.show_overview(&mut columns[today_col_idx]);
-                            Tako::handle_overview_task_response(ctx, task, response, &mut pending_update_task, &mut pending_deletion_id);
+                            Tako::handle_overview_task_response(ctx, &task, response, &mut self.overview_completed_tasks, &mut pending_update_task, &mut pending_deletion_id);
                         }
                     });
                 });
@@ -625,7 +646,7 @@ impl eframe::App for Tako {
             },
             Err(err) => { println!("Couldn't save tasks: {err}") }
         }
-        let curr_completed_tasks_ids: Vec<&u32> = self.overview_completed_tasks.keys().collect();
+        let curr_completed_tasks_ids: Vec<&u32> = self.overview_completed_tasks.iter().collect();
         match serde_json::to_string(&curr_completed_tasks_ids) {
             Ok(tasks_ids) => { 
                 storage.set_string("current_completed_tasks", tasks_ids);
@@ -688,15 +709,15 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
         ..Default::default()
     };
     run_native("Tako", options, Box::new(|cc| {
-        let mut overview_completed_tasks: HashMap<u32, Task> = HashMap::new();
+        let mut overview_completed_tasks: HashSet<u32> = HashSet::new();
         if let Some(storage) = cc.storage { 
             let tasks_str = storage.get_string("tasks").unwrap_or("[]".to_owned());
             let raw_tasks: Vec<Task> = serde_json::from_str(&tasks_str)?;
             let curr_completed_tasks_str = storage.get_string("current_completed_tasks").unwrap_or("[]".to_owned());
             let curr_completed_tasks_ids: HashSet<u32> = serde_json::from_str(&curr_completed_tasks_str)?;
             for task in raw_tasks { 
-                if curr_completed_tasks_ids.contains(&task.id) {
-                    overview_completed_tasks.insert(task.id, task.clone());
+                if matches!(task.status, TaskStatus::Done) && curr_completed_tasks_ids.contains(&task.id) {
+                    overview_completed_tasks.insert(task.id);
                 }
                 oswald.add_task(Box::new(task)); 
             }
