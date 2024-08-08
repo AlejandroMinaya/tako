@@ -327,15 +327,18 @@ impl Tako {
                 let mut pending_update_task: Option<Task> = None;
                 let mut pending_deletion_id: Option<u32> = None;
                 ScrollArea::vertical().show(ui, |ui| {
-                    let num_columns = 1 + self.settings.overview_columns.len();
-                    assert!(num_columns != 0, "There should be at least a column");
+                    let num_columns = 2 + self.settings.overview_columns.len();
+                    assert!(num_columns >= 2, "There should be at least two columns");
                     ui.columns(num_columns, |columns| {
-                        let default_column = &mut columns[0];
-                        default_column.label("Backlog");
+                        let backlog_column = &mut columns[0];
+                        backlog_column.label("Backlog");
 
-                        let named_columns = &mut columns[1..];
+                        let named_columns = &mut columns[1..num_columns-1];
                         named_columns.iter_mut().enumerate()
                             .for_each(|(idx, col)| {col.label(&self.settings.overview_columns[idx]);});
+
+                        let today_column = &mut columns[num_columns-1];
+                        today_column.label("Today");
 
                         for (idx, task) in enumerated_tasks {
                             if idx > 0 && idx % self.settings.target_daily_tasks == 0 && curr_column < num_columns - 1 { curr_column += 1; }
@@ -673,7 +676,6 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
                 target_daily_tasks: 5,
                 overview_columns: vec![
                     "Tomorrow".to_owned(),
-                    "Today".to_owned(),
                 ],
             },
         }))
