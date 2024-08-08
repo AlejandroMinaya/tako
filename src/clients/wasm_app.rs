@@ -321,17 +321,14 @@ impl Tako {
             });
     }
 
-    fn handle_overview_task_response(ctx: &Context, task: &Task, response: Response) -> (Option<Task>, Option<u32>) {
-        let mut pending_update: Option<Task> = None;
-        let mut pending_deletion: Option<u32> = None;
-
+    fn handle_overview_task_response(ctx: &Context, task: &Task, response: Response, pending_update: &mut Option<Task>, pending_deletion: &mut Option<u32>) {
         if response.hovered() {
             ctx.set_cursor_icon(CursorIcon::PointingHand)
         }
 
         if response.double_clicked () {
             if matches!(task.status, TaskStatus::Archived) {
-                pending_deletion = Some(task.id);
+                *pending_deletion = Some(task.id);
             } else {
                 let mut updated_task = task.clone();
                 updated_task.status = match task.status {
@@ -339,7 +336,7 @@ impl Tako {
                     TaskStatus::Done => TaskStatus::Open,
                     _ => TaskStatus::Archived
                 };
-                pending_update = Some(updated_task);
+                *pending_update = Some(updated_task);
             }
         }
 
@@ -349,10 +346,9 @@ impl Tako {
                 TaskStatus::Archived => TaskStatus::Open,
                 _ => TaskStatus::Archived
             };
-            pending_update = Some(updated_task);
+            *pending_update = Some(updated_task);
         }
 
-        return (pending_update, pending_deletion);
     }
 
     fn show_overview_frame(&mut self, ui: &mut Ui, ctx: &Context) {
@@ -385,7 +381,7 @@ impl Tako {
                         );
                         for task in &tasks[..remaining_tasks] {
                             let response = task.show_overview(today_column);
-                            (pending_update_task, pending_deletion_id) = Tako::handle_overview_task_response(ctx, task, response);
+                            Tako::handle_overview_task_response(ctx, task, response, &mut pending_update_task, &mut pending_deletion_id);
                         }
 
                         let mut curr_column = today_col_idx - 1;
@@ -394,7 +390,7 @@ impl Tako {
                             if idx > 0 && idx % self.settings.target_daily_tasks == 0 && curr_column > 0 { curr_column -= 1; }
                             if let Some(column) = columns.get_mut(curr_column) {
                                 let response = task.show_overview(column);
-                                (pending_update_task, pending_deletion_id) = Tako::handle_overview_task_response(ctx, task, response);
+                                Tako::handle_overview_task_response(ctx, task, response, &mut pending_update_task, &mut pending_deletion_id);
                             }
                         }
 
@@ -402,7 +398,7 @@ impl Tako {
                         completed_tasks.sort();
                         for task in completed_tasks {
                             let response = task.show_overview(&mut columns[today_col_idx]);
-                            (pending_update_task, pending_deletion_id) = Tako::handle_overview_task_response(ctx, task, response);
+                            Tako::handle_overview_task_response(ctx, task, response, &mut pending_update_task, &mut pending_deletion_id);
                         }
                     });
                 });
