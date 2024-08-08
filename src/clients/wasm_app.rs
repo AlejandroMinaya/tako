@@ -214,10 +214,12 @@ enum View {
 #[derive(Debug)]
 #[derive(Default)]
 struct Settings {
+    arrange_hide_completed_tasks: bool,
+    arrange_hide_parent_tasks: bool,
     backlog_column_label: String,
     overview_columns: Vec<String>,
+    target_daily_tasks: usize,
     today_column_label: String,
-    target_daily_tasks: usize
 }
 struct Tako {
     oswald: Oswald,
@@ -542,6 +544,8 @@ impl Tako {
                         if ui.add_sized(Vec2::new(144.0, 16.0), Button::new("Add Task")).clicked() {
                             self.form_task = Some(Task::new_with_id(self.next_task_id));
                         }
+                        ui.checkbox(&mut self.settings.arrange_hide_parent_tasks, "Hide parent tasks");
+                        ui.checkbox(&mut self.settings.arrange_hide_completed_tasks, "Hide completed tasks");
                     });
                     ui.separator();
                     let (_, area_rect) = ui.allocate_space(ui.available_size());
@@ -550,7 +554,10 @@ impl Tako {
                         .default_size(ui.available_size())
                         .constrain_to(area_rect)
                         .show(ctx, |ui| {
-                            let tasks: Vec<&Task> = self.oswald.get_all_tasks().into_iter().filter(|task| task.get_complexity() == 1).collect();
+                            let tasks: Vec<&Task> = self.oswald.get_all_tasks().into_iter()
+                                .filter(|task| !self.settings.arrange_hide_completed_tasks || !matches!(task.status, TaskStatus::Done))
+                                .filter(|task| !self.settings.arrange_hide_parent_tasks || task.get_complexity() == 1)
+                                .collect();
                             let mut pending_update_task: Option<Task> = None;
 
                             for task in tasks {
@@ -770,6 +777,8 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
             overview_completed_tasks,
             overview_completed_tasks_last_flush,
             settings: Settings {
+                arrange_hide_parent_tasks: true,
+                arrange_hide_completed_tasks: true,
                 target_daily_tasks: 5,
                 backlog_column_label: "Backlog".to_owned(),
                 overview_columns: vec![
