@@ -79,7 +79,13 @@ impl Task {
         };
 
         let sub_itr = self.subtasks_map.values();
-        sub_itr.fold(1_u32, |result, subtask| result + subtask.get_complexity())
+        sub_itr.fold(1_u32, |result, subtask| {
+            if !matches!(subtask.status, TaskStatus::Open) {
+                result
+            } else {
+                result + subtask.get_complexity()
+            }
+        })
     }
 
     fn _add_subtask(&mut self, subtask: Box<Self>) {
