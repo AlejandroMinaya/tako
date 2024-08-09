@@ -605,6 +605,48 @@ mod task_tests {
     }
 
     #[test]
+    fn test_get_task_complexity_multilevel_ignore_not_open() {
+        /*
+         *           (t)
+         *          /   \
+         *       (sA)   (sB)
+         *             /    \
+         *           (sC)  (sD)
+         *           /  \     \
+         *         (sE)(sF)  (sG)
+         */
+        let mut task = Task::default();
+        // Level 1
+        let mut subtask_a = Box::new(Task::new_with_id(1));
+        subtask_a.status = TaskStatus::Done;
+        
+        let mut subtask_b = Box::new(Task::new_with_id(2));
+        // Level 2
+        let mut subtask_c = Box::new(Task::new_with_id(3));
+        let mut subtask_d = Box::new(Task::new_with_id(4));
+        subtask_d.status = TaskStatus::Archived;
+
+        // Level 3
+        let mut subtask_e = Box::new(Task::new_with_id(5));
+        subtask_e.status = TaskStatus::Blocked;
+        let subtask_f = Box::new(Task::new_with_id(6));
+        let subtask_g = Box::new(Task::new_with_id(7));
+
+        subtask_c.add_subtask(subtask_e);
+        subtask_c.add_subtask(subtask_f);
+
+        subtask_d.add_subtask(subtask_g);
+
+        subtask_b.add_subtask(subtask_d);
+        subtask_b.add_subtask(subtask_c);
+
+        task.add_subtask(subtask_b);
+        task.add_subtask(subtask_a);
+
+        assert_eq!(task.get_complexity(), 4);
+    }
+
+    #[test]
     fn test_get_task_complexity_multilevel_single_leaf() {
         /*
          * (t) - (sA) - (sB) - (sC) - (sD) - (sE)
