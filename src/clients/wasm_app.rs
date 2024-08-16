@@ -136,7 +136,7 @@ impl Task {
         };
         Rect { min: top_left, max: bottom_right }
     }
-    fn show_arrange(&self, ui: &mut Ui, area: &Rect) -> Response {
+    fn show_in_arrange(&self, ui: &mut Ui, area: &Rect) -> Response {
         let task_rect = self.get_arrange_rect(area);
         let mut child_ui = ui.child_ui(task_rect, Layout::centered_and_justified(Direction::TopDown), None);
         child_ui.add(self)
@@ -456,6 +456,8 @@ impl Tako {
                         if ui.add_sized(Vec2::new(144.0, 16.0), Button::new("Add Task")).clicked() {
                             self.form_task = Some(Task::new_with_id(self.next_task_id));
                         }
+                        ui.checkbox(&mut self.settings.arrange_hide_parent_tasks, "Hide parent tasks");
+                        ui.checkbox(&mut self.settings.arrange_hide_completed_tasks, "Hide completed tasks");
                     });
                     ui.separator();
                     let (_, area_rect) = ui.allocate_space(ui.available_size());
@@ -464,16 +466,21 @@ impl Tako {
                         .default_size(ui.available_size())
                         .constrain_to(area_rect)
                         .show(ctx, |ui| {
-                            let tasks = match self.arrange_nested_tasks.last() {
+                            let tasks: Vec<&Task> = (match self.arrange_nested_tasks.last() {
+                                // TODO (2024-08-15): consider oswald implementing the task trait
+                                // No real need to have different method names
                                 Some(parent_task) => parent_task.get_subtasks(),
                                 None => self.oswald.get_tasks()
-                            };
+                            }).into_iter()
+                            .filter(|task| !self.settings.arrange_hide_completed_tasks || !matches!(task.status, TaskStatus::Done))
+                            .filter(|task| !self.settings.arrange_hide_parent_tasks || task.get_complexity() == 1)
+                            .collect();
                             let mut pending_update_task: Option<Task> = None;
                             let mut pending_deletion_id: Option<u32> = None;
                             let mut new_parent_task: Option<Task> = None;
 
                             for task in tasks {
-                                let response = task.show_arrange(ui, &area_rect);
+                                let response = task.show_in_arrange(ui, &area_rect);
 
                                 if response.hovered() {
                                     ui.ctx().set_cursor_icon(CursorIcon::Grab);
@@ -561,7 +568,7 @@ impl Tako {
                             let mut pending_update_task: Option<Task> = None;
 
                             for task in tasks {
-                                let response = task.show_arrange(ui, &area_rect);
+                                let response = task.show_in_arrange(ui, &area_rect);
 
                                 if response.hovered() {
                                     ui.ctx().set_cursor_icon(CursorIcon::Grab);
