@@ -1,0 +1,2 @@
+[submodule "protobuf"]
+	url = git@github.com:AlejandroMinaya/tako-protobuf.git
