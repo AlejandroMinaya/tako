@@ -45,7 +45,7 @@ pub struct Task {
     pub urgency: f32,
     pub status: TaskStatus,
     pub desc: String,
-    subtasks_map: HashMap<u32, Box<Self>>,
+    subtasks: HashMap<u32, Box<Self>>,
 }
 impl Task {
     pub fn new(id: u32, desc: String, importance: f32, urgency: f32, status: TaskStatus) -> Self {
@@ -55,7 +55,7 @@ impl Task {
             urgency,
             status,
             desc,
-            subtasks_map: HashMap::new()
+            subtasks: HashMap::new()
         }
     }
     pub fn new_with_id(id: u32) -> Self {
@@ -74,11 +74,11 @@ impl Task {
     }
 
     pub fn get_complexity(&self) -> u32 {
-        if self.subtasks_map.is_empty() {
+        if self.subtasks.is_empty() {
             return 1;
         };
 
-        let sub_itr = self.subtasks_map.values();
+        let sub_itr = self.subtasks.values();
         sub_itr.fold(1_u32, |result, subtask| {
             if !matches!(subtask.status, TaskStatus::Open) {
                 result
@@ -89,7 +89,7 @@ impl Task {
     }
 
     fn _add_subtask(&mut self, subtask: Box<Self>) {
-        self.subtasks_map.insert(subtask.id, subtask);
+        self.subtasks.insert(subtask.id, subtask);
     }
     pub fn add_subtask(&mut self, subtask: Box<Self>) {
         match self.get_subtask_parent(subtask.id) {
@@ -98,7 +98,7 @@ impl Task {
         }
     }
     fn _delete_subtask(&mut self, id: u32) {
-        self.subtasks_map.remove(&id);
+        self.subtasks.remove(&id);
     }
     pub fn delete_subtask(&mut self, id: u32) {
         match self.get_subtask_parent(id) {
@@ -107,7 +107,7 @@ impl Task {
         }
     }
 
-    pub fn add_subtasks_vec(&mut self, subtasks: BoxTaskVec) {
+    pub fn extend_subtasks(&mut self, subtasks: BoxTaskVec) {
         // TODO (maybe): name the function with an iterator with fill
         // TODO: Implement logic to be able to .collect() into the subtasks
         subtasks.into_iter().for_each(|subtask| self.add_subtask(subtask))
@@ -116,7 +116,7 @@ impl Task {
     pub fn get_subtasks(&self) -> Vec<&Self> {
         // TODO (maybe): Cache vector and only sort after insertion/deletion to the map, instead of each time
         let mut collected_subtasks: Vec<&Self> = self
-            .subtasks_map
+            .subtasks
             .values()
             .map(|boxed_task| boxed_task.as_ref())
             .collect();
@@ -125,14 +125,14 @@ impl Task {
     }
     pub fn get_all_subtasks(&self) -> Vec<&Self> {
         let mut all_subtasks: Vec<&Self> = vec![];
-        if self.subtasks_map.is_empty() {
+        if self.subtasks.is_empty() {
             return all_subtasks;
         }
-        self.subtasks_map.values().for_each(|subtask| {
+        self.subtasks.values().for_each(|subtask| {
             let mut microtasks = subtask.get_all_subtasks();
             all_subtasks.append(&mut microtasks);
         });
-        self.subtasks_map.values().for_each(|subtask| {
+        self.subtasks.values().for_each(|subtask| {
             all_subtasks.push(subtask);
         });
         all_subtasks.sort();
@@ -141,11 +141,11 @@ impl Task {
 
     fn get_subtask_parent(&mut self, id: u32) -> Option<&mut Task> {
         // Searching self
-        if self.subtasks_map.contains_key(&id) {
+        if self.subtasks.contains_key(&id) {
            return Some(self)
         }
         // Searching subtasks
-        for subtask in self.subtasks_map.values_mut() {
+        for subtask in self.subtasks.values_mut() {
             if let Some(parent) = subtask.get_subtask_parent(id) {
                 return Some(parent)
             }
@@ -199,7 +199,7 @@ impl PartialOrd for Task {
 }
 impl std::fmt::Debug for Task {
     fn fmt(&self, f:&mut std::fmt::Formatter<'_>) -> std::fmt::Result where TaskStatus: std::fmt::Debug {  
-        write!(f, "Task #{} ({:?}) | (children: {})", self.id, self.status, self.subtasks_map.len())?;
+        write!(f, "Task #{} ({:?}) | (children: {})", self.id, self.status, self.subtasks.len())?;
         write!(f, " | I: {}, U: {}, C: {}", self.importance, self.urgency, self.get_complexity())
     }
 }
@@ -225,8 +225,8 @@ mod task_tests {
         root.add_subtask(task_a.clone());
         root.add_subtask(task_b.clone());
 
-        assert!(root.subtasks_map.contains_key(&1));
-        assert!(root.subtasks_map.contains_key(&2));
+        assert!(root.subtasks.contains_key(&1));
+        assert!(root.subtasks.contains_key(&2));
     }
 
     #[test]
@@ -516,7 +516,7 @@ mod task_tests {
         });
         root.add_subtask(new_microtask_a);
 
-        assert_eq!(root.subtasks_map.len(), 1);
+        assert_eq!(root.subtasks.len(), 1);
 
         let mut itr = root.get_subtasks().into_iter();
         let retrieved_subtask = itr.next().expect("expected task with id = 1");
@@ -797,11 +797,11 @@ mod task_tests {
             Box::new(Task::new_with_id(3))
         ];
 
-        root.add_subtasks_vec(tasks);
+        root.extend_subtasks(tasks);
 
-        assert!(root.subtasks_map.contains_key(&1));
-        assert!(root.subtasks_map.contains_key(&2));
-        assert!(root.subtasks_map.contains_key(&3));
+        assert!(root.subtasks.contains_key(&1));
+        assert!(root.subtasks.contains_key(&2));
+        assert!(root.subtasks.contains_key(&3));
 
     }
 }
@@ -871,30 +871,30 @@ mod oswald_tests {
 
         let _ = oswald.load().await;
 
-        assert!(oswald.root.subtasks_map.contains_key(&0));
-        assert!(oswald.root.subtasks_map.contains_key(&1));
-        assert!(oswald.root.subtasks_map.contains_key(&2));
+        assert!(oswald.root.subtasks.contains_key(&0));
+        assert!(oswald.root.subtasks.contains_key(&1));
+        assert!(oswald.root.subtasks.contains_key(&2));
 
         assert!(oswald
             .root
-            .subtasks_map
+            .subtasks
             .get(&0)
             .unwrap()
-            .subtasks_map
+            .subtasks
             .contains_key(&3));
         assert!(oswald
             .root
-            .subtasks_map
+            .subtasks
             .get(&2)
             .unwrap()
-            .subtasks_map
+            .subtasks
             .contains_key(&4));
         assert!(oswald
             .root
-            .subtasks_map
+            .subtasks
             .get(&2)
             .unwrap()
-            .subtasks_map
+            .subtasks
             .contains_key(&5));
     }
 
@@ -905,7 +905,7 @@ mod oswald_tests {
 
         oswald.add_task(task);
 
-        assert!(oswald.root.subtasks_map.contains_key(&1));
+        assert!(oswald.root.subtasks.contains_key(&1));
     }
 
     #[test]
@@ -953,10 +953,10 @@ mod oswald_tests {
 
         oswald.add_task(task);
 
-        assert!(oswald.root.subtasks_map.contains_key(&1));
+        assert!(oswald.root.subtasks.contains_key(&1));
 
         oswald.clear();
-        assert!(oswald.root.subtasks_map.is_empty());
+        assert!(oswald.root.subtasks.is_empty());
     }
 
     #[tokio::test]
