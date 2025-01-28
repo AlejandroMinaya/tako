@@ -1,23 +1,11 @@
-
+use crate::ports::DataStore;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 use std::sync::Arc;
-use crate::ports::DataStore;
 
 /* TASK STATUS ============================================================= */
-#[derive(
-    Debug,
-    Default,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Clone,
-    Copy,
-    Serialize,
-    Deserialize
-)]
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum TaskStatus {
     #[default]
@@ -33,7 +21,6 @@ impl From<i32> for TaskStatus {
             254 => TaskStatus::Archived,
             255 => TaskStatus::Done,
             _ => TaskStatus::Open,
-
         }
     }
 }
@@ -48,6 +35,14 @@ pub struct Task {
     subtasks: HashMap<u32, Box<Self>>,
 }
 impl Task {
+    fn _add_subtask(&mut self, subtask: Box<Self>) {
+        self.subtasks.insert(subtask.id, subtask);
+    }
+
+    fn _delete_subtask(&mut self, id: u32) {
+        self.subtasks.remove(&id);
+    }
+
     pub fn new(id: u32, desc: String, importance: f32, urgency: f32, status: TaskStatus) -> Self {
         Task {
             id,
@@ -55,7 +50,7 @@ impl Task {
             urgency,
             status,
             desc,
-            subtasks: HashMap::new()
+            subtasks: HashMap::new(),
         }
     }
     pub fn new_with_id(id: u32) -> Self {
@@ -67,8 +62,6 @@ impl Task {
     fn get_distance(&self) -> f32 {
         let importance = self.importance * self.importance.abs();
         let urgency = self.urgency * self.urgency.abs();
-
-        
 
         (importance + urgency).clamp(f32::MIN, f32::MAX)
     }
@@ -88,29 +81,33 @@ impl Task {
         })
     }
 
-    fn _add_subtask(&mut self, subtask: Box<Self>) {
-        self.subtasks.insert(subtask.id, subtask);
-    }
     pub fn add_subtask(&mut self, subtask: Box<Self>) {
         match self.get_subtask_parent(subtask.id) {
-            Some(parent) => { parent._add_subtask(subtask); },
-            None => { self._add_subtask(subtask); }
+            Some(parent) => {
+                parent._add_subtask(subtask);
+            }
+            None => {
+                self._add_subtask(subtask);
+            }
         }
-    }
-    fn _delete_subtask(&mut self, id: u32) {
-        self.subtasks.remove(&id);
     }
     pub fn delete_subtask(&mut self, id: u32) {
         match self.get_subtask_parent(id) {
-            Some(parent) => { parent._delete_subtask(id); },
-            None => { self._delete_subtask(id); }
+            Some(parent) => {
+                parent._delete_subtask(id);
+            }
+            None => {
+                self._delete_subtask(id);
+            }
         }
     }
 
     pub fn extend_subtasks(&mut self, subtasks: BoxTaskVec) {
         // TODO (maybe): name the function with an iterator with fill
         // TODO: Implement logic to be able to .collect() into the subtasks
-        subtasks.into_iter().for_each(|subtask| self.add_subtask(subtask))
+        subtasks
+            .into_iter()
+            .for_each(|subtask| self.add_subtask(subtask))
     }
 
     pub fn get_subtasks(&self) -> Vec<&Self> {
@@ -142,12 +139,12 @@ impl Task {
     fn get_subtask_parent(&mut self, id: u32) -> Option<&mut Task> {
         // Searching self
         if self.subtasks.contains_key(&id) {
-           return Some(self)
+            return Some(self);
         }
         // Searching subtasks
         for subtask in self.subtasks.values_mut() {
             if let Some(parent) = subtask.get_subtask_parent(id) {
-                return Some(parent)
+                return Some(parent);
             }
         }
         // Not found
@@ -198,9 +195,24 @@ impl PartialOrd for Task {
     }
 }
 impl std::fmt::Debug for Task {
-    fn fmt(&self, f:&mut std::fmt::Formatter<'_>) -> std::fmt::Result where TaskStatus: std::fmt::Debug {  
-        write!(f, "Task #{} ({:?}) | (children: {})", self.id, self.status, self.subtasks.len())?;
-        write!(f, " | I: {}, U: {}, C: {}", self.importance, self.urgency, self.get_complexity())
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+    where
+        TaskStatus: std::fmt::Debug,
+    {
+        write!(
+            f,
+            "Task #{} ({:?}) | (children: {})",
+            self.id,
+            self.status,
+            self.subtasks.len()
+        )?;
+        write!(
+            f,
+            " | I: {}, U: {}, C: {}",
+            self.importance,
+            self.urgency,
+            self.get_complexity()
+        )
     }
 }
 
@@ -258,9 +270,24 @@ mod task_tests {
         task.add_subtask(subtask_b);
         task.add_subtask(subtask_a);
 
-        assert_eq!(task.get_subtask_parent(3).expect("Expected Task with id = 2").id, 2);
-        assert_eq!(task.get_subtask_parent(4).expect("Expected Task with id = 2").id, 2);
-        assert_eq!(task.get_subtask_parent(5).expect("Expected Task with id = 4").id, 4);
+        assert_eq!(
+            task.get_subtask_parent(3)
+                .expect("Expected Task with id = 2")
+                .id,
+            2
+        );
+        assert_eq!(
+            task.get_subtask_parent(4)
+                .expect("Expected Task with id = 2")
+                .id,
+            2
+        );
+        assert_eq!(
+            task.get_subtask_parent(5)
+                .expect("Expected Task with id = 4")
+                .id,
+            4
+        );
         assert_eq!(task.get_subtask_parent(6), None);
     }
 
@@ -625,7 +652,7 @@ mod task_tests {
         // Level 1
         let mut subtask_a = Box::new(Task::new_with_id(1));
         subtask_a.status = TaskStatus::Done;
-        
+
         let mut subtask_b = Box::new(Task::new_with_id(2));
         // Level 2
         let mut subtask_c = Box::new(Task::new_with_id(3));
@@ -743,7 +770,7 @@ mod task_tests {
 
     #[test]
     fn test_collect_all_tasks() {
-        /*      
+        /*
          *            (r)
          *           /   \
          *       (tA)    (tB)
@@ -753,7 +780,7 @@ mod task_tests {
          *    (mA)(mB)
          */
         let mut root = Box::new(Task::default());
-        
+
         let mut task_a = Box::new(Task::new_with_id(1));
         let mut task_b = Box::new(Task::new_with_id(2));
 
@@ -784,7 +811,6 @@ mod task_tests {
         assert_eq!(itr.next().expect("Expected Task #4").id, 4);
         assert_eq!(itr.next().expect("Expected Task #1").id, 1);
         assert_eq!(itr.next(), None);
-
     }
 
     #[test]
@@ -794,7 +820,7 @@ mod task_tests {
         let tasks = vec![
             Box::new(Task::new_with_id(1)),
             Box::new(Task::new_with_id(2)),
-            Box::new(Task::new_with_id(3))
+            Box::new(Task::new_with_id(3)),
         ];
 
         root.extend_subtasks(tasks);
@@ -802,7 +828,6 @@ mod task_tests {
         assert!(root.subtasks.contains_key(&1));
         assert!(root.subtasks.contains_key(&2));
         assert!(root.subtasks.contains_key(&3));
-
     }
 }
 
@@ -811,13 +836,13 @@ mod task_tests {
 #[derive(Debug, Clone)]
 pub struct Oswald {
     root: Task,
-    data_store: Arc<dyn DataStore + Send + Sync>
+    data_store: Arc<dyn DataStore + Send + Sync>,
 }
 impl Oswald {
     pub fn new(data_store: impl DataStore + Send + Sync + 'static) -> Self {
         Oswald {
             root: Task::default(),
-            data_store: Arc::new(data_store)
+            data_store: Arc::new(data_store),
         }
     }
     pub fn add_task(&mut self, task: Box<Task>) {
@@ -859,10 +884,7 @@ impl Oswald {
 /* TESTS =================================================================== */
 #[cfg(test)]
 mod oswald_tests {
-    use super::{
-        Oswald,
-        Task
-    };
+    use super::{Oswald, Task};
     use crate::ports::MockDataStore;
 
     #[tokio::test]
@@ -963,7 +985,10 @@ mod oswald_tests {
     async fn test_get_loaded_tasks() {
         let mut oswald = Oswald::new(MockDataStore);
 
-        assert!(oswald.load().await.is_ok(), "Expected MockDataStore to load");
+        assert!(
+            oswald.load().await.is_ok(),
+            "Expected MockDataStore to load"
+        );
 
         let mut itr = oswald.get_all_tasks().into_iter();
 
@@ -979,7 +1004,10 @@ mod oswald_tests {
     async fn test_get_top_loaded_tasks() {
         let mut oswald = Oswald::new(MockDataStore);
 
-        assert!(oswald.load().await.is_ok(), "Expected MockDataStore to load");
+        assert!(
+            oswald.load().await.is_ok(),
+            "Expected MockDataStore to load"
+        );
 
         let mut itr = oswald.get_tasks().into_iter();
 
@@ -997,7 +1025,10 @@ mod oswald_tests {
     async fn test_save_loaded_tasks() {
         let oswald = Oswald::new(MockDataStore);
 
-        assert!(oswald.save().await.is_ok(), "Expected MockDataStore to save");
+        assert!(
+            oswald.save().await.is_ok(),
+            "Expected MockDataStore to save"
+        );
     }
 }
 
