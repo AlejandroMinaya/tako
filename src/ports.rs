@@ -1,8 +1,5 @@
+use crate::app::tasks::{BoxTaskVec, Task};
 use async_trait::async_trait;
-use crate::core::tasks::{
-    Task,
-    BoxTaskVec
-};
 use std::fmt::Debug;
 
 #[async_trait]

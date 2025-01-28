@@ -1,7 +1,7 @@
-use crate::core::tasks::Oswald;
+use crate::app::tasks::Oswald;
 
-mod core;
 mod adapters;
+mod app;
 mod clients;
 mod ports;
 

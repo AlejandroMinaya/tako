@@ -1,41 +1,14 @@
+use crate::app::tasks::{Oswald, Task, TaskStatus};
+use chrono::{Local, NaiveDate};
+use eframe::{run_native, NativeOptions, Storage};
+use egui::{
+    text::LayoutJob, Align, Align2, Area, Button, CentralPanel, Color32, Context, CursorIcon,
+    Direction, FontFamily, FontId, Frame, Id, Layout, Pos2, Rect, Response, ScrollArea, Sense,
+    SidePanel, Slider, Ui, Vec2, ViewportBuilder, Window,
+};
 use std::cmp::{max, min};
 use std::collections::HashSet;
 use std::time::Duration;
-use chrono::{NaiveDate, Local};
-use egui::{
-    Slider,
-    Layout,
-    Direction,
-    Window,
-    Button,
-    Context,
-    ViewportBuilder,
-    Color32,
-    Vec2,
-    Pos2,
-    Ui,
-    Frame,
-    SidePanel,
-    CentralPanel,
-    Align,
-    Align2,
-    Response,
-    Sense,
-    FontId,
-    ScrollArea,
-    FontFamily,
-    Rect,
-    Area,
-    CursorIcon,
-    Id,
-    text::LayoutJob
-};
-use eframe::{
-    NativeOptions,
-    Storage,
-    run_native
-};
-use crate::core::tasks::{Oswald, Task, TaskStatus};
 
 const AUTO_SAVE_INTERVAL: Duration = Duration::new(10, 0);
 
@@ -53,7 +26,10 @@ const BUTTON_MARGIN: f32 = 2.0;
 const BUTTON_PADDING: f32 = 8.0;
 const BUTTON_RADIUS: f32 = 16.0;
 
-const ARRANGE_LABEL_FONT: FontId = FontId { size: 12.0, family: FontFamily::Monospace };
+const ARRANGE_LABEL_FONT: FontId = FontId {
+    size: 12.0,
+    family: FontFamily::Monospace,
+};
 const ARRANGE_FG: Color32 = Color32::from_rgb(125, 125, 125);
 
 const TASK_BG: Color32 = Color32::from_rgb(109, 33, 79);
@@ -78,7 +54,6 @@ const MAX_ARRANGE_RECT: f32 = 100.0;
 const MIN_ARRANGE_RECT: f32 = -100.0;
 const RANGE_ARRANGE_RECT: f32 = MAX_ARRANGE_RECT - MIN_ARRANGE_RECT;
 
-
 const MAX_TARGET_DAILY_TASKS: usize = 24;
 
 fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
@@ -93,7 +68,7 @@ fn norm_value(mut curr: f32, mut min_val: f32, mut max_val: f32) -> f32 {
     (curr - min_val) / (max_val - min_val)
 }
 
-impl Task { 
+impl Task {
     fn delta_update(&mut self, delta: &Vec2, area: &Rect) {
         let mut urgency_delta = delta.x / area.width() * RANGE_ARRANGE_RECT;
         let mut importance_delta = -delta.y / area.height() * RANGE_ARRANGE_RECT;
@@ -103,48 +78,59 @@ impl Task {
         self.importance += importance_delta;
     }
     fn get_arrange_rect(&self, area: &Rect) -> Rect {
-        let norm_importance =  norm_value(self.importance, MIN_ARRANGE_RECT, MAX_ARRANGE_RECT);
-        let norm_urgency =  norm_value(self.urgency, MIN_ARRANGE_RECT, MAX_ARRANGE_RECT);
+        let norm_importance = norm_value(self.importance, MIN_ARRANGE_RECT, MAX_ARRANGE_RECT);
+        let norm_urgency = norm_value(self.urgency, MIN_ARRANGE_RECT, MAX_ARRANGE_RECT);
 
-        let half_task_width = TASK_SIZE.x/2.0;
-        let half_task_height = TASK_SIZE.y/2.0;
+        let half_task_width = TASK_SIZE.x / 2.0;
+        let half_task_height = TASK_SIZE.y / 2.0;
 
         let area = Rect {
             min: Pos2 {
                 x: area.min.x + half_task_width,
-                y: area.min.y + half_task_height
+                y: area.min.y + half_task_height,
             },
             max: Pos2 {
                 x: area.max.x - half_task_width,
-                y: area.max.y - half_task_height
-            }
+                y: area.max.y - half_task_height,
+            },
         };
         let area_width = area.width();
         let area_height = area.height();
 
         let center = Pos2 {
             x: area.min.x + norm_urgency * area_width,
-            y: area.min.y + (1.0 - norm_importance) * area_height
+            y: area.min.y + (1.0 - norm_importance) * area_height,
         };
         let top_left = Pos2 {
             x: center.x - half_task_width,
-            y: center.y - half_task_height
+            y: center.y - half_task_height,
         };
         let bottom_right = Pos2 {
             x: center.x + half_task_width,
-            y: center.y + half_task_height
+            y: center.y + half_task_height,
         };
-        Rect { min: top_left, max: bottom_right }
+        Rect {
+            min: top_left,
+            max: bottom_right,
+        }
     }
     fn show_in_arrange(&self, ui: &mut Ui, area: &Rect) -> Response {
         let task_rect = self.get_arrange_rect(area);
-        let mut child_ui = ui.child_ui(task_rect, Layout::centered_and_justified(Direction::TopDown), None);
+        let mut child_ui = ui.child_ui(
+            task_rect,
+            Layout::centered_and_justified(Direction::TopDown),
+            None,
+        );
         child_ui.add(self)
     }
 
     fn show_overview(&self, ui: &mut Ui) -> Response {
         let (task_rect, _) = ui.allocate_at_least(TASK_SIZE, Sense::click());
-        let mut child_ui = ui.child_ui(task_rect, Layout::centered_and_justified(Direction::TopDown), None);
+        let mut child_ui = ui.child_ui(
+            task_rect,
+            Layout::centered_and_justified(Direction::TopDown),
+            None,
+        );
         child_ui.add(self)
     }
 }
@@ -161,42 +147,52 @@ impl egui::Widget for &Task {
             (TaskStatus::Archived, true) => ARCHIVED_TASK_HOVERED_BG,
             (TaskStatus::Archived, false) => ARCHIVED_TASK_BG,
             (_, true) => TASK_HOVERED_BG,
-            (_, false) => TASK_BG
+            (_, false) => TASK_BG,
         };
         let font_color = match task_stat {
             (TaskStatus::Done, _) => DONE_TASK_FG,
             (TaskStatus::Archived, _) => ARCHIVED_TASK_FG,
-            _ => TASK_FG
+            _ => TASK_FG,
         };
         let complexity = self.get_complexity();
-        background_color = background_color.gamma_multiply(1.0/complexity as f32);
+        background_color = background_color.gamma_multiply(1.0 / complexity as f32);
         let content_rect = rect.shrink(TASK_PADDING);
 
-        ui.painter().rect_filled(rect, TASK_RADIUS, background_color);
+        ui.painter()
+            .rect_filled(rect, TASK_RADIUS, background_color);
 
         let mut content_width = content_rect.width();
         if complexity > 1 {
             let complexity_galley = ui.painter().layout_no_wrap(
                 format!("{}", complexity - 1),
-                FontId { size: TASK_SMALL_FONT_SIZE, family: FontFamily::Monospace },
+                FontId {
+                    size: TASK_SMALL_FONT_SIZE,
+                    family: FontFamily::Monospace,
+                },
                 font_color,
             );
             content_width -= complexity_galley.rect.width();
 
             let mut complexity_anchor = Align2::RIGHT_CENTER.pos_in_rect(&content_rect);
-            complexity_anchor.x -= complexity_galley.rect.width()/2.0;
-            complexity_anchor.y -= complexity_galley.rect.height()/2.0;
-            ui.painter().galley(complexity_anchor, complexity_galley, font_color);
-
+            complexity_anchor.x -= complexity_galley.rect.width() / 2.0;
+            complexity_anchor.y -= complexity_galley.rect.height() / 2.0;
+            ui.painter()
+                .galley(complexity_anchor, complexity_galley, font_color);
         }
         let desc_galley = ui.painter().layout(
             self.desc.clone(),
-            FontId { size: TASK_FONT_SIZE, family: FontFamily::Monospace },
+            FontId {
+                size: TASK_FONT_SIZE,
+                family: FontFamily::Monospace,
+            },
             font_color,
-            content_width
+            content_width,
         );
         let y_desc_offset = (content_rect.height() - desc_galley.rect.height()) / 2.0;
-        let desc_pos = Pos2::new(content_rect.min.x, content_rect.min.y + y_desc_offset.max(0.0));
+        let desc_pos = Pos2::new(
+            content_rect.min.x,
+            content_rect.min.y + y_desc_offset.max(0.0),
+        );
         ui.painter().galley(desc_pos, desc_galley, background_color);
 
         response
@@ -208,11 +204,10 @@ enum View {
     Arrange,
     ArrangeAll,
     #[default]
-    Overview
+    Overview,
 }
 
-#[derive(Debug)]
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Settings {
     arrange_hide_completed_tasks: bool,
     arrange_hide_parent_tasks: bool,
@@ -230,68 +225,76 @@ struct Tako {
     open_settings: bool,
     overview_completed_tasks: HashSet<u32>,
     overview_completed_tasks_last_flush: Option<NaiveDate>,
-    settings: Settings
+    settings: Settings,
 }
 impl Tako {
     fn tako_full_button(&self, ui: &mut Ui, text: &str, selected: bool) -> Response {
         let width = ui.available_width();
         let height = BUTTON_FONT_SIZE + BUTTON_PADDING;
         let (rect, response) = ui.allocate_exact_size([width, height].into(), Sense::click());
-        let background_color = 
-            if selected {
-                BUTTON_SELECTED_BG
-            } else if response.hovered() {
-                BUTTON_HOVERED_BG
-            } else {
-                BUTTON_BG
-            };
+        let background_color = if selected {
+            BUTTON_SELECTED_BG
+        } else if response.hovered() {
+            BUTTON_HOVERED_BG
+        } else {
+            BUTTON_BG
+        };
         let content_rect = rect.shrink(BUTTON_PADDING);
         let mut text_layout = LayoutJob::simple(
             text.to_string(),
-            FontId { size: BUTTON_FONT_SIZE, family: FontFamily::Monospace },
+            FontId {
+                size: BUTTON_FONT_SIZE,
+                family: FontFamily::Monospace,
+            },
             BUTTON_FG,
-            content_rect.width()
+            content_rect.width(),
         );
         text_layout.halign = Align::Center;
         let mut text_pos = Align2::CENTER_CENTER.pos_in_rect(&content_rect);
-        text_pos.y -= BUTTON_FONT_SIZE/2.0;
+        text_pos.y -= BUTTON_FONT_SIZE / 2.0;
 
-        Frame::default()
-            .outer_margin(BUTTON_MARGIN)
-            .show(ui, |ui| {
-                let text_galley = ui.painter().layout_job(text_layout);
-                ui.painter().rect_filled(rect, BUTTON_RADIUS, background_color);
-                ui.painter().galley(text_pos, text_galley, BUTTON_FG);
-            });
+        Frame::default().outer_margin(BUTTON_MARGIN).show(ui, |ui| {
+            let text_galley = ui.painter().layout_job(text_layout);
+            ui.painter()
+                .rect_filled(rect, BUTTON_RADIUS, background_color);
+            ui.painter().galley(text_pos, text_galley, BUTTON_FG);
+        });
 
         response
     }
 
     fn show_arrange_labels(&self, ui: &mut Ui, rect: &Rect) {
-        let north_label = ui.painter().layout_no_wrap("(+) important".to_owned(), ARRANGE_LABEL_FONT, ARRANGE_FG);
-        let south_label = ui.painter().layout_no_wrap("(-) important".to_owned(), ARRANGE_LABEL_FONT, ARRANGE_FG);
-        let west_label = ui.painter().layout_no_wrap("(-) urgency".to_owned(), ARRANGE_LABEL_FONT, ARRANGE_FG);
-        let east_label = ui.painter().layout_no_wrap("(+) urgency".to_owned(), ARRANGE_LABEL_FONT, ARRANGE_FG);
+        let north_label =
+            ui.painter()
+                .layout_no_wrap("(+) important".to_owned(), ARRANGE_LABEL_FONT, ARRANGE_FG);
+        let south_label =
+            ui.painter()
+                .layout_no_wrap("(-) important".to_owned(), ARRANGE_LABEL_FONT, ARRANGE_FG);
+        let west_label =
+            ui.painter()
+                .layout_no_wrap("(-) urgency".to_owned(), ARRANGE_LABEL_FONT, ARRANGE_FG);
+        let east_label =
+            ui.painter()
+                .layout_no_wrap("(+) urgency".to_owned(), ARRANGE_LABEL_FONT, ARRANGE_FG);
 
         let mut north_anchor = Align2::CENTER_TOP.pos_in_rect(rect);
-        north_anchor.x -= north_label.rect.width()/2.0;
+        north_anchor.x -= north_label.rect.width() / 2.0;
 
         let mut south_anchor = Align2::CENTER_BOTTOM.pos_in_rect(rect);
-        south_anchor.x -= south_label.rect.width()/2.0;
+        south_anchor.x -= south_label.rect.width() / 2.0;
         south_anchor.y -= south_label.rect.height();
 
         let mut west_anchor = Align2::LEFT_CENTER.pos_in_rect(rect);
-        west_anchor.y -= west_label.rect.height()/2.0;
+        west_anchor.y -= west_label.rect.height() / 2.0;
 
         let mut east_anchor = Align2::RIGHT_CENTER.pos_in_rect(rect);
         east_anchor.x -= east_label.rect.width();
-        east_anchor.y -= east_label.rect.height()/2.0;
+        east_anchor.y -= east_label.rect.height() / 2.0;
 
         ui.painter().galley(north_anchor, north_label, ARRANGE_FG);
         ui.painter().galley(south_anchor, south_label, ARRANGE_FG);
         ui.painter().galley(west_anchor, west_label, ARRANGE_FG);
         ui.painter().galley(east_anchor, east_label, ARRANGE_FG);
-
     }
 
     fn show_menu(&mut self, ctx: &Context) {
@@ -302,21 +305,49 @@ impl Tako {
                 ui.vertical_centered(|ui| {
                     ui.heading("tako");
                     ui.add_space(MENU_PADDING.y);
-                    if self.tako_full_button(ui, "Overview", matches!(self.current_view, View::Overview)).clicked() {
+                    if self
+                        .tako_full_button(
+                            ui,
+                            "Overview",
+                            matches!(self.current_view, View::Overview),
+                        )
+                        .clicked()
+                    {
                         self.current_view = View::Overview;
                         self.save_arrange();
                         self.arrange_nested_tasks.clear();
                     }
-                    if self.tako_full_button(ui, "Arrange (All)", matches!(self.current_view, View::ArrangeAll)).clicked() {
+                    if self
+                        .tako_full_button(
+                            ui,
+                            "Arrange (All)",
+                            matches!(self.current_view, View::ArrangeAll),
+                        )
+                        .clicked()
+                    {
                         self.current_view = View::ArrangeAll;
                     }
-                    if self.tako_full_button(ui, "Arrange (Tree)", matches!(self.current_view, View::Arrange)).clicked() {
+                    if self
+                        .tako_full_button(
+                            ui,
+                            "Arrange (Tree)",
+                            matches!(self.current_view, View::Arrange),
+                        )
+                        .clicked()
+                    {
                         self.current_view = View::Arrange;
                     }
                     ui.add_space(ui.available_size().y - MENU_BOTTOM_SECTION - MENU_PADDING.y);
                     ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
                         ui.add_space(MENU_PADDING.y);
-                        if self.tako_full_button(ui, "Settings", matches!(self.current_view, View::Arrange)).clicked() {
+                        if self
+                            .tako_full_button(
+                                ui,
+                                "Settings",
+                                matches!(self.current_view, View::Arrange),
+                            )
+                            .clicked()
+                        {
                             self.open_settings = true;
                         }
                     });
@@ -330,7 +361,7 @@ impl Tako {
         response: Response,
         completed_tasks: &mut HashSet<u32>,
         pending_update: &mut Option<Task>,
-        pending_deletion: &mut Option<u32>
+        pending_deletion: &mut Option<u32>,
     ) {
         if response.hovered() {
             ctx.set_cursor_icon(CursorIcon::PointingHand)
@@ -344,7 +375,7 @@ impl Tako {
                 updated_task.status = match task.status {
                     TaskStatus::Open => TaskStatus::Done,
                     TaskStatus::Done => TaskStatus::Open,
-                    _ => TaskStatus::Archived
+                    _ => TaskStatus::Archived,
                 };
 
                 if matches!(updated_task.status, TaskStatus::Done) {
@@ -357,259 +388,315 @@ impl Tako {
             }
         }
 
-        if response.secondary_clicked () {
+        if response.secondary_clicked() {
             let mut updated_task = task.clone();
             updated_task.status = match task.status {
                 TaskStatus::Archived => TaskStatus::Open,
-                _ => TaskStatus::Archived
+                _ => TaskStatus::Archived,
             };
             *pending_update = Some(updated_task);
         }
-
-
     }
 
     fn show_overview_frame(&mut self, ui: &mut Ui, ctx: &Context) {
-        Frame::default()
-            .show(ui, |ui| {
-                let all_tasks = self.oswald.get_all_tasks();
-                let mut completed_tasks: Vec<&Task> = vec![];
-                let mut tasks: Vec<&Task> = vec![];
-                for task in all_tasks.into_iter() {
-                    if self.overview_completed_tasks.contains(&task.id) {
-                        completed_tasks.push(task);
-                    } else {
-                        tasks.push(task);
-                    }
+        Frame::default().show(ui, |ui| {
+            let all_tasks = self.oswald.get_all_tasks();
+            let mut completed_tasks: Vec<&Task> = vec![];
+            let mut tasks: Vec<&Task> = vec![];
+            for task in all_tasks.into_iter() {
+                if self.overview_completed_tasks.contains(&task.id) {
+                    completed_tasks.push(task);
+                } else {
+                    tasks.push(task);
                 }
-                let mut pending_update_task: Option<Task> = None;
-                let mut pending_deletion_id: Option<u32> = None;
-                ScrollArea::vertical().show(ui, |ui| {
-                    let num_columns = 2 + self.settings.overview_columns.len();
-                    assert!(num_columns >= 2, "There should be at least two columns");
+            }
+            let mut pending_update_task: Option<Task> = None;
+            let mut pending_deletion_id: Option<u32> = None;
+            ScrollArea::vertical().show(ui, |ui| {
+                let num_columns = 2 + self.settings.overview_columns.len();
+                assert!(num_columns >= 2, "There should be at least two columns");
 
-                    ui.columns(num_columns, |columns| {
-                        let today_col_idx = num_columns - 1;
+                ui.columns(num_columns, |columns| {
+                    let today_col_idx = num_columns - 1;
 
-                        // Naming the columns
-                        let backlog_column = &mut columns[0];
-                        backlog_column.label(&self.settings.backlog_column_label);
+                    // Naming the columns
+                    let backlog_column = &mut columns[0];
+                    backlog_column.label(&self.settings.backlog_column_label);
 
-                        let named_columns = &mut columns[1..today_col_idx];
-                        named_columns.iter_mut().enumerate()
-                            .for_each(|(idx, col)| {col.label(&self.settings.overview_columns[idx]);});
-
-                        let today_column = &mut columns[today_col_idx];
-                        today_column.label(&self.settings.today_column_label);
-
-                        // Painting the tasks
-                        let target_tasks = min(self.settings.target_daily_tasks, tasks.len() + completed_tasks.len());
-                        let remaining_tasks = if target_tasks > completed_tasks.len() { target_tasks - completed_tasks.len() } else { 0 };
-                        for task in &tasks[..remaining_tasks] {
-                            let response = task.show_overview(today_column);
-                            Tako::handle_overview_task_response(ctx, task, response, &mut self.overview_completed_tasks, &mut pending_update_task, &mut pending_deletion_id);
-                        }
-
-                        let mut curr_column = today_col_idx - 1;
-                        let enumerated_tasks = tasks[remaining_tasks..].into_iter().enumerate();
-                        for (idx, task) in enumerated_tasks {
-                            if idx > 0 && idx % self.settings.target_daily_tasks == 0 && curr_column > 0 { curr_column -= 1; }
-                            if let Some(column) = columns.get_mut(curr_column) {
-                                let response = task.show_overview(column);
-                                Tako::handle_overview_task_response(ctx, task, response, &mut self.overview_completed_tasks, &mut pending_update_task, &mut pending_deletion_id);
-                            }
-                        }
-
-                        for task in completed_tasks {
-                            let response = task.show_overview(&mut columns[today_col_idx]);
-                            Tako::handle_overview_task_response(ctx, &task, response, &mut self.overview_completed_tasks, &mut pending_update_task, &mut pending_deletion_id);
-                        }
+                    let named_columns = &mut columns[1..today_col_idx];
+                    named_columns.iter_mut().enumerate().for_each(|(idx, col)| {
+                        col.label(&self.settings.overview_columns[idx]);
                     });
+
+                    let today_column = &mut columns[today_col_idx];
+                    today_column.label(&self.settings.today_column_label);
+
+                    // Painting the tasks
+                    let target_tasks = min(
+                        self.settings.target_daily_tasks,
+                        tasks.len() + completed_tasks.len(),
+                    );
+                    let remaining_tasks = if target_tasks > completed_tasks.len() {
+                        target_tasks - completed_tasks.len()
+                    } else {
+                        0
+                    };
+                    for task in &tasks[..remaining_tasks] {
+                        let response = task.show_overview(today_column);
+                        Tako::handle_overview_task_response(
+                            ctx,
+                            task,
+                            response,
+                            &mut self.overview_completed_tasks,
+                            &mut pending_update_task,
+                            &mut pending_deletion_id,
+                        );
+                    }
+
+                    let mut curr_column = today_col_idx - 1;
+                    let enumerated_tasks = tasks[remaining_tasks..].into_iter().enumerate();
+                    for (idx, task) in enumerated_tasks {
+                        if idx > 0 && idx % self.settings.target_daily_tasks == 0 && curr_column > 0
+                        {
+                            curr_column -= 1;
+                        }
+                        if let Some(column) = columns.get_mut(curr_column) {
+                            let response = task.show_overview(column);
+                            Tako::handle_overview_task_response(
+                                ctx,
+                                task,
+                                response,
+                                &mut self.overview_completed_tasks,
+                                &mut pending_update_task,
+                                &mut pending_deletion_id,
+                            );
+                        }
+                    }
+
+                    for task in completed_tasks {
+                        let response = task.show_overview(&mut columns[today_col_idx]);
+                        Tako::handle_overview_task_response(
+                            ctx,
+                            &task,
+                            response,
+                            &mut self.overview_completed_tasks,
+                            &mut pending_update_task,
+                            &mut pending_deletion_id,
+                        );
+                    }
                 });
-                if let Some(task) = pending_update_task {
-                    self.oswald.add_task(Box::new(task));
-                }
-                if let Some(task_id) = pending_deletion_id {
-                    self.oswald.delete_task(task_id);
-                }
             });
+            if let Some(task) = pending_update_task {
+                self.oswald.add_task(Box::new(task));
+            }
+            if let Some(task_id) = pending_deletion_id {
+                self.oswald.delete_task(task_id);
+            }
+        });
     }
 
     fn show_arrange_frame(&mut self, ui: &mut Ui, ctx: &Context) {
         self.show_task_form(ctx);
-        Frame::default()
-            .show(ui, |ui| {
-                ui.vertical(|ui| {
+        Frame::default().show(ui, |ui| {
+            ui.vertical(|ui| {
+                ui.horizontal(|ui| {
                     ui.horizontal(|ui| {
-                        ui.horizontal(|ui| {
-                            if let Some(parent_task) = self.arrange_nested_tasks.last() {
-                                ui.label(parent_task.desc.clone());
+                        if let Some(parent_task) = self.arrange_nested_tasks.last() {
+                            ui.label(parent_task.desc.clone());
 
-                                if ui.button("Home").clicked() {
-                                    self.arrange_nested_tasks.clear();
-                                };
-                                if ui.button("Back").clicked() {
-                                    self.arrange_nested_tasks.pop();
-                                }
+                            if ui.button("Home").clicked() {
+                                self.arrange_nested_tasks.clear();
+                            };
+                            if ui.button("Back").clicked() {
+                                self.arrange_nested_tasks.pop();
                             }
-                        });
-                        if ui.add_sized(Vec2::new(144.0, 16.0), Button::new("Add Task")).clicked() {
-                            self.form_task = Some(Task::new_with_id(self.next_task_id));
                         }
-                        ui.checkbox(&mut self.settings.arrange_hide_parent_tasks, "Hide parent tasks");
-                        ui.checkbox(&mut self.settings.arrange_hide_completed_tasks, "Hide completed tasks");
                     });
-                    ui.separator();
-                    let (_, area_rect) = ui.allocate_space(ui.available_size());
-                    Area::new("Arrange".into())
-                        .movable(true)
-                        .default_size(ui.available_size())
-                        .constrain_to(area_rect)
-                        .show(ctx, |ui| {
-                            let tasks: Vec<&Task> = (match self.arrange_nested_tasks.last() {
-                                // TODO (2024-08-15): consider oswald implementing the task trait
-                                // No real need to have different method names
-                                Some(parent_task) => parent_task.get_subtasks(),
-                                None => self.oswald.get_tasks()
-                            }).into_iter()
-                            .filter(|task| !self.settings.arrange_hide_completed_tasks || !matches!(task.status, TaskStatus::Done))
-                            .filter(|task| !self.settings.arrange_hide_parent_tasks || task.get_complexity() == 1)
-                            .collect();
-                            let mut pending_update_task: Option<Task> = None;
-                            let mut pending_deletion_id: Option<u32> = None;
-                            let mut new_parent_task: Option<Task> = None;
-
-                            for task in tasks {
-                                let response = task.show_in_arrange(ui, &area_rect);
-
-                                if response.hovered() {
-                                    ui.ctx().set_cursor_icon(CursorIcon::Grab);
-                                }
-
-                                if response.middle_clicked() {
-                                    self.form_task = Some(task.clone());
-                                } 
-                                if response.double_clicked() {
-                                    new_parent_task = Some(task.clone());
-                                }
-
-                                if response.secondary_clicked() {
-                                    if matches!(task.status, TaskStatus::Archived) {
-                                        pending_deletion_id = Some(task.id);
-                                    } else {
-                                        let mut updated_task = task.clone();
-                                        updated_task.status = TaskStatus::Archived;
-                                        pending_update_task = Some(updated_task);
-                                    }
-                                }
-
-
-
-                                if response.dragged() {
-                                    ui.ctx().set_cursor_icon(CursorIcon::Grabbing);
-                                    let delta = response.drag_delta();
-                                    if delta != Vec2::ZERO {
-                                        let mut task = task.clone();
-                                        task.delta_update(&delta, &area_rect);
-                                        pending_update_task = Some(task);
-                                    }
-                                }
-                            }
-                            self.show_arrange_labels(ui, &area_rect);
-
-                            if let Some(task) = pending_update_task { 
-                                let task = Box::new(task);
-                                match &mut self.arrange_nested_tasks.last_mut() {
-                                    Some(parent) => parent.add_subtask(task),
-                                    None => self.oswald.add_task(task)
-                                }
-                                self.save_arrange();
-                            }
-
-                            if let Some(task_id) = pending_deletion_id {
-                                match &mut self.arrange_nested_tasks.last_mut() {
-                                    Some(parent) => parent.delete_subtask(task_id),
-                                    None => self.oswald.delete_task(task_id)
-                                }
-                                self.save_arrange();
-                            }
-
-                            if let Some(new_parent_task) = new_parent_task.take() {
-                                self.arrange_nested_tasks.push(new_parent_task);
-                            }
-                        });
+                    if ui
+                        .add_sized(Vec2::new(144.0, 16.0), Button::new("Add Task"))
+                        .clicked()
+                    {
+                        self.form_task = Some(Task::new_with_id(self.next_task_id));
+                    }
+                    ui.checkbox(
+                        &mut self.settings.arrange_hide_parent_tasks,
+                        "Hide parent tasks",
+                    );
+                    ui.checkbox(
+                        &mut self.settings.arrange_hide_completed_tasks,
+                        "Hide completed tasks",
+                    );
                 });
+                ui.separator();
+                let (_, area_rect) = ui.allocate_space(ui.available_size());
+                Area::new("Arrange".into())
+                    .movable(true)
+                    .default_size(ui.available_size())
+                    .constrain_to(area_rect)
+                    .show(ctx, |ui| {
+                        let tasks: Vec<&Task> = (match self.arrange_nested_tasks.last() {
+                            // TODO (2024-08-15): consider oswald implementing the task trait
+                            // No real need to have different method names
+                            Some(parent_task) => parent_task.get_subtasks(),
+                            None => self.oswald.get_tasks(),
+                        })
+                        .into_iter()
+                        .filter(|task| {
+                            !self.settings.arrange_hide_completed_tasks
+                                || !matches!(task.status, TaskStatus::Done)
+                        })
+                        .filter(|task| {
+                            !self.settings.arrange_hide_parent_tasks || task.get_complexity() == 1
+                        })
+                        .collect();
+                        let mut pending_update_task: Option<Task> = None;
+                        let mut pending_deletion_id: Option<u32> = None;
+                        let mut new_parent_task: Option<Task> = None;
+
+                        for task in tasks {
+                            let response = task.show_in_arrange(ui, &area_rect);
+
+                            if response.hovered() {
+                                ui.ctx().set_cursor_icon(CursorIcon::Grab);
+                            }
+
+                            if response.middle_clicked() {
+                                self.form_task = Some(task.clone());
+                            }
+                            if response.double_clicked() {
+                                new_parent_task = Some(task.clone());
+                            }
+
+                            if response.secondary_clicked() {
+                                if matches!(task.status, TaskStatus::Archived) {
+                                    pending_deletion_id = Some(task.id);
+                                } else {
+                                    let mut updated_task = task.clone();
+                                    updated_task.status = TaskStatus::Archived;
+                                    pending_update_task = Some(updated_task);
+                                }
+                            }
+
+                            if response.dragged() {
+                                ui.ctx().set_cursor_icon(CursorIcon::Grabbing);
+                                let delta = response.drag_delta();
+                                if delta != Vec2::ZERO {
+                                    let mut task = task.clone();
+                                    task.delta_update(&delta, &area_rect);
+                                    pending_update_task = Some(task);
+                                }
+                            }
+                        }
+                        self.show_arrange_labels(ui, &area_rect);
+
+                        if let Some(task) = pending_update_task {
+                            let task = Box::new(task);
+                            match &mut self.arrange_nested_tasks.last_mut() {
+                                Some(parent) => parent.add_subtask(task),
+                                None => self.oswald.add_task(task),
+                            }
+                            self.save_arrange();
+                        }
+
+                        if let Some(task_id) = pending_deletion_id {
+                            match &mut self.arrange_nested_tasks.last_mut() {
+                                Some(parent) => parent.delete_subtask(task_id),
+                                None => self.oswald.delete_task(task_id),
+                            }
+                            self.save_arrange();
+                        }
+
+                        if let Some(new_parent_task) = new_parent_task.take() {
+                            self.arrange_nested_tasks.push(new_parent_task);
+                        }
+                    });
             });
+        });
     }
 
     fn show_arrange_all_frame(&mut self, ui: &mut Ui, ctx: &Context) {
         self.show_task_form(ctx);
-        Frame::default()
-            .show(ui, |ui| {
-                ui.vertical(|ui| {
-                    ui.horizontal(|ui| {
-                        if ui.add_sized(Vec2::new(144.0, 16.0), Button::new("Add Task")).clicked() {
-                            self.form_task = Some(Task::new_with_id(self.next_task_id));
-                        }
-                        ui.checkbox(&mut self.settings.arrange_hide_parent_tasks, "Hide parent tasks");
-                        ui.checkbox(&mut self.settings.arrange_hide_completed_tasks, "Hide completed tasks");
-                    });
-                    ui.separator();
-                    let (_, area_rect) = ui.allocate_space(ui.available_size());
-                    Area::new("Arrange".into())
-                        .movable(true)
-                        .default_size(ui.available_size())
-                        .constrain_to(area_rect)
-                        .show(ctx, |ui| {
-                            let tasks: Vec<&Task> = self.oswald.get_all_tasks().into_iter()
-                                .filter(|task| !self.settings.arrange_hide_completed_tasks || !matches!(task.status, TaskStatus::Done))
-                                .filter(|task| !self.settings.arrange_hide_parent_tasks || task.get_complexity() == 1)
-                                .collect();
-                            let mut pending_update_task: Option<Task> = None;
-
-                            for task in tasks {
-                                let response = task.show_in_arrange(ui, &area_rect);
-
-                                if response.hovered() {
-                                    ui.ctx().set_cursor_icon(CursorIcon::Grab);
-                                }
-
-                                if response.triple_clicked() {
-                                    self.form_task = Some(task.clone());
-                                }
-
-                                if response.dragged() {
-                                    ui.ctx().set_cursor_icon(CursorIcon::Grabbing);
-                                    let delta = response.drag_motion();
-                                    if delta != Vec2::ZERO {
-                                        let mut task = task.clone();
-                                        task.delta_update(&delta, &area_rect);
-                                        pending_update_task = Some(task);
-                                    }
-                                }
-                            }
-                            self.show_arrange_labels(ui, &area_rect);
-
-                            if let Some(task) = pending_update_task {
-                                self.oswald.add_task(Box::new(task));
-                            }
-                    });
+        Frame::default().show(ui, |ui| {
+            ui.vertical(|ui| {
+                ui.horizontal(|ui| {
+                    if ui
+                        .add_sized(Vec2::new(144.0, 16.0), Button::new("Add Task"))
+                        .clicked()
+                    {
+                        self.form_task = Some(Task::new_with_id(self.next_task_id));
+                    }
+                    ui.checkbox(
+                        &mut self.settings.arrange_hide_parent_tasks,
+                        "Hide parent tasks",
+                    );
+                    ui.checkbox(
+                        &mut self.settings.arrange_hide_completed_tasks,
+                        "Hide completed tasks",
+                    );
                 });
+                ui.separator();
+                let (_, area_rect) = ui.allocate_space(ui.available_size());
+                Area::new("Arrange".into())
+                    .movable(true)
+                    .default_size(ui.available_size())
+                    .constrain_to(area_rect)
+                    .show(ctx, |ui| {
+                        let tasks: Vec<&Task> = self
+                            .oswald
+                            .get_all_tasks()
+                            .into_iter()
+                            .filter(|task| {
+                                !self.settings.arrange_hide_completed_tasks
+                                    || !matches!(task.status, TaskStatus::Done)
+                            })
+                            .filter(|task| {
+                                !self.settings.arrange_hide_parent_tasks
+                                    || task.get_complexity() == 1
+                            })
+                            .collect();
+                        let mut pending_update_task: Option<Task> = None;
+
+                        for task in tasks {
+                            let response = task.show_in_arrange(ui, &area_rect);
+
+                            if response.hovered() {
+                                ui.ctx().set_cursor_icon(CursorIcon::Grab);
+                            }
+
+                            if response.triple_clicked() {
+                                self.form_task = Some(task.clone());
+                            }
+
+                            if response.dragged() {
+                                ui.ctx().set_cursor_icon(CursorIcon::Grabbing);
+                                let delta = response.drag_motion();
+                                if delta != Vec2::ZERO {
+                                    let mut task = task.clone();
+                                    task.delta_update(&delta, &area_rect);
+                                    pending_update_task = Some(task);
+                                }
+                            }
+                        }
+                        self.show_arrange_labels(ui, &area_rect);
+
+                        if let Some(task) = pending_update_task {
+                            self.oswald.add_task(Box::new(task));
+                        }
+                    });
             });
+        });
     }
     fn show_task_form(&mut self, ctx: &Context) {
         let mut pending_cancel = false;
         let mut pending_save = false;
         if let Some(task) = &mut self.form_task {
-            Window::new("Task Form")
-                .title_bar(false)
-                .show(ctx, |ui| { 
+            Window::new("Task Form").title_bar(false).show(ctx, |ui| {
                 ui.vertical(|ui| {
                     ui.text_edit_singleline(&mut task.desc);
                     ui.horizontal(|ui| {
                         if ui.button("Cancel").clicked() {
                             pending_cancel = true;
-                        } 
+                        }
                         if ui.button("Save").clicked() {
                             pending_save = true;
                         }
@@ -617,7 +704,9 @@ impl Tako {
                 });
             });
         }
-        if pending_cancel { self.form_task = None; }
+        if pending_cancel {
+            self.form_task = None;
+        }
         if pending_save {
             if let Some(task) = self.form_task.take() {
                 let task = Box::new(task);
@@ -629,7 +718,7 @@ impl Tako {
                 match self.arrange_nested_tasks.last_mut() {
                     Some(parent_task) => {
                         parent_task.add_subtask(task);
-                    },
+                    }
                     None => {
                         self.oswald.add_task(task);
                     }
@@ -656,7 +745,7 @@ impl Tako {
         let today = Local::now().date_naive();
         let update_date = match self.overview_completed_tasks_last_flush {
             Some(old_flush_date) => (today - old_flush_date).num_days() > 0,
-            None => true
+            None => true,
         };
         if update_date {
             self.overview_completed_tasks.clear();
@@ -668,40 +757,46 @@ impl eframe::App for Tako {
     fn save(&mut self, storage: &mut dyn Storage) {
         let tasks = self.oswald.get_tasks();
         match serde_json::to_string(&tasks) {
-            Ok(tasks_str) => { 
+            Ok(tasks_str) => {
                 storage.set_string("tasks", tasks_str);
-            },
-            Err(err) => { println!("Couldn't save tasks: {err}") }
+            }
+            Err(err) => {
+                println!("Couldn't save tasks: {err}")
+            }
         }
 
         let curr_completed_tasks_ids: Vec<&u32> = self.overview_completed_tasks.iter().collect();
         match serde_json::to_string(&curr_completed_tasks_ids) {
-            Ok(tasks_ids) => { 
+            Ok(tasks_ids) => {
                 storage.set_string("current_completed_tasks", tasks_ids);
-            },
-            Err(err) => { println!("Couldn't save current completed tasks: {err}") }
+            }
+            Err(err) => {
+                println!("Couldn't save current completed tasks: {err}")
+            }
         };
 
         match serde_json::to_string(&self.overview_completed_tasks_last_flush) {
             Ok(last_flush_date) => {
                 storage.set_string("completed_tasks_last_flush", last_flush_date);
-            },
-            Err(err) => { println!("Couldn't save the last flush date: {err}") }
+            }
+            Err(err) => {
+                println!("Couldn't save the last flush date: {err}")
+            }
         }
     }
 
-    fn auto_save_interval(&self) -> Duration { AUTO_SAVE_INTERVAL }
+    fn auto_save_interval(&self) -> Duration {
+        AUTO_SAVE_INTERVAL
+    }
 
-    fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) { 
+    fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
         self.auto_flush_overview_completed_tasks();
         self.show_menu(ctx);
 
-        CentralPanel::default().show(ctx, |ui| {
-            match self.current_view {
-                View::Overview => self.show_overview_frame(ui, ctx),
-                View::Arrange => self.show_arrange_frame(ui, ctx),
-                View::ArrangeAll => self.show_arrange_all_frame(ui, ctx)
-            }
+        CentralPanel::default().show(ctx, |ui| match self.current_view {
+            View::Overview => self.show_overview_frame(ui, ctx),
+            View::Arrange => self.show_arrange_frame(ui, ctx),
+            View::ArrangeAll => self.show_arrange_all_frame(ui, ctx),
         });
 
         let mut column_to_remove: Option<usize> = None;
@@ -713,7 +808,10 @@ impl eframe::App for Tako {
                     ui.vertical(|ui| {
                         ui.add_space(DEFAULT_MARGIN);
                         ui.label("# of tasks / day:");
-                        ui.add(Slider::new(&mut self.settings.target_daily_tasks, 1..=MAX_TARGET_DAILY_TASKS))
+                        ui.add(Slider::new(
+                            &mut self.settings.target_daily_tasks,
+                            1..=MAX_TARGET_DAILY_TASKS,
+                        ))
                     });
                     ui.vertical(|ui| {
                         ui.add_space(DEFAULT_MARGIN);
@@ -746,53 +844,56 @@ pub async fn start(mut oswald: Oswald) -> eframe::Result {
         viewport: ViewportBuilder::default(),
         ..Default::default()
     };
-    run_native("Tako", options, Box::new(|cc| {
-        let mut overview_completed_tasks: HashSet<u32> = HashSet::new();
-        let mut overview_completed_tasks_last_flush: Option<NaiveDate> = None;
-        if let Some(storage) = cc.storage { 
-            // Retrieve all tasks
-            let tasks_str = storage.get_string("tasks").unwrap_or("[]".to_owned());
-            let raw_tasks: Vec<Task> = serde_json::from_str(&tasks_str)?;
-            for task in raw_tasks { 
-                oswald.add_task(Box::new(task)); 
+    run_native(
+        "Tako",
+        options,
+        Box::new(|cc| {
+            let mut overview_completed_tasks: HashSet<u32> = HashSet::new();
+            let mut overview_completed_tasks_last_flush: Option<NaiveDate> = None;
+            if let Some(storage) = cc.storage {
+                // Retrieve all tasks
+                let tasks_str = storage.get_string("tasks").unwrap_or("[]".to_owned());
+                let raw_tasks: Vec<Task> = serde_json::from_str(&tasks_str)?;
+                for task in raw_tasks {
+                    oswald.add_task(Box::new(task));
+                }
+
+                // Retrieve completed tasks
+                let curr_completed_tasks_str = storage
+                    .get_string("current_completed_tasks")
+                    .unwrap_or("[]".to_owned());
+                overview_completed_tasks = serde_json::from_str(&curr_completed_tasks_str)?;
+
+                // Retrieve last completed tasks flush date
+                let last_flush_date_str = storage.get_string("completed_tasks_last_flush");
+                if let Some(raw_date) = last_flush_date_str {
+                    overview_completed_tasks_last_flush = serde_json::from_str(&raw_date)?;
+                }
             }
+            let mut next_task_id: u32 = 1;
 
-            // Retrieve completed tasks
-            let curr_completed_tasks_str = storage.get_string("current_completed_tasks").unwrap_or("[]".to_owned());
-            overview_completed_tasks = serde_json::from_str(&curr_completed_tasks_str)?;
-
-
-            // Retrieve last completed tasks flush date
-            let last_flush_date_str = storage.get_string("completed_tasks_last_flush");
-            if let Some(raw_date) = last_flush_date_str {
-                overview_completed_tasks_last_flush = serde_json::from_str(&raw_date)?;
+            for task in oswald.get_all_tasks() {
+                next_task_id = max(next_task_id, task.id + 1);
             }
-        }
-        let mut next_task_id: u32 = 1;
-
-        for task in oswald.get_all_tasks() {
-            next_task_id = max(next_task_id, task.id + 1);
-        }
-        // Defaults
-        Ok(Box::new(Tako {
-            oswald, 
-            arrange_nested_tasks: vec![],
-            current_view: View::Overview,
-            form_task: None,
-            next_task_id,
-            open_settings: false,
-            overview_completed_tasks,
-            overview_completed_tasks_last_flush,
-            settings: Settings {
-                arrange_hide_parent_tasks: true,
-                arrange_hide_completed_tasks: true,
-                target_daily_tasks: 5,
-                backlog_column_label: "Backlog".to_owned(),
-                overview_columns: vec![
-                    "Tomorrow".to_owned(),
-                ],
-                today_column_label: "Today".to_owned()
-            },
-        }))
-    }))
+            // Defaults
+            Ok(Box::new(Tako {
+                oswald,
+                arrange_nested_tasks: vec![],
+                current_view: View::Overview,
+                form_task: None,
+                next_task_id,
+                open_settings: false,
+                overview_completed_tasks,
+                overview_completed_tasks_last_flush,
+                settings: Settings {
+                    arrange_hide_parent_tasks: true,
+                    arrange_hide_completed_tasks: true,
+                    target_daily_tasks: 5,
+                    backlog_column_label: "Backlog".to_owned(),
+                    overview_columns: vec!["Tomorrow".to_owned()],
+                    today_column_label: "Today".to_owned(),
+                },
+            }))
+        }),
+    )
 }
