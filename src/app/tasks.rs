@@ -1,8 +1,6 @@
-use crate::ports::DataStore;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 /* TASK STATUS ============================================================= */
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
@@ -833,18 +831,11 @@ mod task_tests {
 
 /* OSWALD (TASK SERVICE) =================================================== */
 // https://www.imdb.com/title/tt0293734/
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Oswald {
     root: Task,
-    data_store: Arc<dyn DataStore + Send + Sync>,
 }
 impl Oswald {
-    pub fn new(data_store: impl DataStore + Send + Sync + 'static) -> Self {
-        Oswald {
-            root: Task::default(),
-            data_store: Arc::new(data_store),
-        }
-    }
     pub fn add_task(&mut self, task: Box<Task>) {
         self.root.add_subtask(task)
     }
@@ -864,65 +855,16 @@ impl Oswald {
     pub fn clear(&mut self) {
         self.root = Task::default();
     }
-
-    // TODO: Use status type design pattern in the future
-    pub async fn load(&mut self) -> anyhow::Result<()> {
-        let tasks = self.data_store.read().await?;
-        for task in tasks.into_iter() {
-            self.root.add_subtask(task)
-        }
-
-        Ok(())
-    }
-
-    pub async fn save(&self) -> anyhow::Result<()> {
-        let tasks = self.get_tasks();
-        self.data_store.write(tasks).await
-    }
 }
 
 /* TESTS =================================================================== */
 #[cfg(test)]
 mod oswald_tests {
     use super::{Oswald, Task};
-    use crate::ports::MockDataStore;
-
-    #[tokio::test]
-    async fn test_load_all_tasks_from_data_store() {
-        let mut oswald = Oswald::new(MockDataStore);
-
-        let _ = oswald.load().await;
-
-        assert!(oswald.root.subtasks.contains_key(&0));
-        assert!(oswald.root.subtasks.contains_key(&1));
-        assert!(oswald.root.subtasks.contains_key(&2));
-
-        assert!(oswald
-            .root
-            .subtasks
-            .get(&0)
-            .unwrap()
-            .subtasks
-            .contains_key(&3));
-        assert!(oswald
-            .root
-            .subtasks
-            .get(&2)
-            .unwrap()
-            .subtasks
-            .contains_key(&4));
-        assert!(oswald
-            .root
-            .subtasks
-            .get(&2)
-            .unwrap()
-            .subtasks
-            .contains_key(&5));
-    }
 
     #[test]
     fn test_add_task() {
-        let mut oswald = Oswald::new(MockDataStore);
+        let mut oswald = Oswald::default();
         let task = Box::new(Task::new_with_id(1));
 
         oswald.add_task(task);
@@ -941,7 +883,7 @@ mod oswald_tests {
          *                 |
          *                (sE)
          */
-        let mut oswald = Oswald::new(MockDataStore);
+        let mut oswald = Oswald::default();
         // Level 1
         let subtask_a = Box::new(Task::new_with_id(1));
         let mut subtask_b = Box::new(Task::new_with_id(2));
@@ -970,7 +912,7 @@ mod oswald_tests {
 
     #[test]
     fn test_clear() {
-        let mut oswald = Oswald::new(MockDataStore);
+        let mut oswald = Oswald::default();
         let task = Box::new(Task::new_with_id(1));
 
         oswald.add_task(task);
@@ -979,56 +921,6 @@ mod oswald_tests {
 
         oswald.clear();
         assert!(oswald.root.subtasks.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_get_loaded_tasks() {
-        let mut oswald = Oswald::new(MockDataStore);
-
-        assert!(
-            oswald.load().await.is_ok(),
-            "Expected MockDataStore to load"
-        );
-
-        let mut itr = oswald.get_all_tasks().into_iter();
-
-        assert_eq!(itr.next().expect("Expected  Task #1").id, 1);
-        assert_eq!(itr.next().expect("Expected  Task #3").id, 3);
-        assert_eq!(itr.next().expect("Expected  Task #4").id, 4);
-        assert_eq!(itr.next().expect("Expected  Task #5").id, 5);
-        assert_eq!(itr.next().expect("Expected  Task #0").id, 0);
-        assert_eq!(itr.next().expect("Expected  Task #2").id, 2);
-        assert_eq!(itr.next(), None);
-    }
-    #[tokio::test]
-    async fn test_get_top_loaded_tasks() {
-        let mut oswald = Oswald::new(MockDataStore);
-
-        assert!(
-            oswald.load().await.is_ok(),
-            "Expected MockDataStore to load"
-        );
-
-        let mut itr = oswald.get_tasks().into_iter();
-
-        assert_eq!(itr.next().expect("Expected  Task #1").id, 1);
-        assert_eq!(itr.next().expect("Expected  Task #0").id, 0);
-        assert_eq!(itr.next().expect("Expected  Task #2").id, 2);
-        assert_eq!(itr.next(), None);
-    }
-
-    // TODO: This test could be more robust if we find a way to intercept the tasks that are going
-    // to be written to the mock data store.
-    //
-    // Right now it is only making sure that the .write() is being called
-    #[tokio::test]
-    async fn test_save_loaded_tasks() {
-        let oswald = Oswald::new(MockDataStore);
-
-        assert!(
-            oswald.save().await.is_ok(),
-            "Expected MockDataStore to save"
-        );
     }
 }
 
