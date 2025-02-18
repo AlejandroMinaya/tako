@@ -4,22 +4,26 @@ version = "0.2.0"
 edition = "2021"
 
 [features]
-default  = ["wasm_app"]
-wasm_app = []
-sqlite = ["dep:sqlx"]
-rest_api = ["dep:axum"]
+default  = ["rpc"]
+wasm_app = [
+    "dep:egui",
+    "dep:eframe",
+    "dep:chrono"
+]
+rpc = [
+    "dep:sqlx",
+    "dep:tokio",
+]
 
 [dependencies]
 anyhow = "1.0.86"
 async-recursion = "1.1.1"
 async-trait = "0.1.81"
-axum = { version = "0.7.5", features = ["macros"], optional = true }
-chrono = { version = "0.4.38", features = ["serde"] }
-eframe = { version = "0.28.1", features = ["persistence"] }
-egui = "0.28.1"
+chrono = { version = "0.4.38", features = ["serde"], optional = true }
+eframe = { version = "0.28.1", features = ["persistence"], optional = true }
+egui = { version = "0.28.1", optional = true }
 futures = "0.3.30"
 serde = "1.0.204"
 serde_json = "1.0.121"
-sqlx = { version = "0.8.0", features = ["runtime-tokio", "sqlite"], optional = true }
-tarpc = { version = "0.35.0", features = ["tokio-serde"] }
-tokio = { version = "1.39.2", features = ["rt", "macros", "full", "rt-multi-thread"] }
+sqlx = { version = "0.8.0", features = ["runtime-tokio", "postgres", "tls-rustls"], optional = true }
+tokio = { version = "1.39.2", features = ["rt", "macros", "full", "rt-multi-thread"], optional = true}
