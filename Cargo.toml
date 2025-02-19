@@ -13,12 +13,22 @@ wasm_app = [
 rpc = [
     "dep:sqlx",
     "dep:tokio",
+    "dep:tokio-util",
+    "dep:capnp",
+    "dep:capnp-rpc",
+    "dep:capnpc",
 ]
+
+[build-dependencies]
+capnpc = { version = "0.20.1", optional = true }
+
 
 [dependencies]
 anyhow = "1.0.86"
 async-recursion = "1.1.1"
 async-trait = "0.1.81"
+capnp = { version = "0.20.3", optional = true }
+capnp-rpc = { version = "0.20.3", optional = true }
 chrono = { version = "0.4.38", features = ["serde"], optional = true }
 eframe = { version = "0.28.1", features = ["persistence"], optional = true }
 egui = { version = "0.28.1", optional = true }
@@ -27,3 +37,4 @@ serde = "1.0.204"
 serde_json = "1.0.121"
 sqlx = { version = "0.8.0", features = ["runtime-tokio", "postgres", "tls-rustls"], optional = true }
 tokio = { version = "1.39.2", features = ["rt", "macros", "full", "rt-multi-thread"], optional = true}
+tokio-util = { version = "0.7.13", features = ["compat"], optional = true }

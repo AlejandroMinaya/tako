@@ -1,3 +1,8 @@
+use std::net::ToSocketAddrs;
+
+use capnp_rpc::{rpc_twoparty_capnp, twoparty, RpcSystem};
+use tokio::net::unix::SocketAddr;
+
 use crate::app::tasks::Oswald;
 
 mod app;
@@ -14,7 +19,7 @@ async fn main() -> anyhow::Result<()> {
 
     #[cfg(feature = "rpc")]
     if cfg!(feature = "rpc") {
-        println!("rpc not implemented yet");
+        let address = "127.0.0.1:8008".to_socket_addrs()?;
     }
 
     Ok(())
